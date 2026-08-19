@@ -1,0 +1,969 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="light">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>AI Feature Risk Triage</title>
+<meta name="description" content="A pre-ship risk assessment framework for AI features. Evidence-tagged findings, severity anchors written in advance, recommendations with conditions attached.">
+<style>
+  :root {
+    color-scheme: light;
+    --page:#f4f3ef; --card:#fcfcfb; --card-2:#efeee9;
+    --ink:#0b0b0b; --ink-2:#52514e; --ink-3:#6f6e69;
+    --line:#e2e0da; --line-2:#cfcdc5;
+    --accent:#2a78d6; --accent-soft:#e8f0fc;
+    --good:#0ca30c; --warning:#fab219; --serious:#ec835a; --critical:#d03b3b;
+    --stated:#1baf7a; --derived:#2a78d6; --unknown:#6f6e69;
+    --mono:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;
+    --sans:-apple-system,BlinkMacSystemFont,"Segoe UI",Helvetica,Arial,sans-serif;
+    --maxw:820px;
+  }
+  :root[data-theme="dark"] {
+    color-scheme: dark;
+    --page:#121211; --card:#1a1a19; --card-2:#232322;
+    --ink:#ffffff; --ink-2:#c3c2b7; --ink-3:#94938a;
+    --line:#2e2e2b; --line-2:#3d3d39;
+    --accent:#3987e5; --accent-soft:#17273c;
+    --stated:#199e70; --derived:#3987e5; --unknown:#94938a;
+  }
+  * { box-sizing:border-box; }
+  html { scroll-behavior:smooth; }
+  body {
+    margin:0; background:var(--page); color:var(--ink);
+    font-family:var(--sans); font-size:17px; line-height:1.6;
+    -webkit-font-smoothing:antialiased;
+  }
+  .wrap { max-width:var(--maxw); margin:0 auto; padding:0 24px; }
+  .wide { max-width:1080px; }
+  a { color:var(--accent); text-decoration:none; }
+  a:hover { text-decoration:underline; }
+  h1,h2,h3 { line-height:1.25; letter-spacing:-0.015em; margin:0 0 .5em; }
+  h1 { font-size:2.6rem; font-weight:650; }
+  h2 { font-size:1.7rem; font-weight:600; margin-top:0; }
+  h3 { font-size:1.15rem; font-weight:600; }
+  p { margin:0 0 1.1em; }
+  code, .mono { font-family:var(--mono); font-size:.88em; }
+
+  /* header */
+  header.top {
+    border-bottom:1px solid var(--line); background:var(--card);
+    position:sticky; top:0; z-index:50; backdrop-filter:saturate(1.4) blur(6px);
+  }
+  .topbar { display:flex; align-items:center; gap:16px; height:56px; }
+  .brand { font-weight:650; letter-spacing:-.01em; font-size:.98rem; }
+  .topnav { margin-left:auto; display:flex; gap:20px; align-items:center; font-size:.87rem; }
+  .topnav a { color:var(--ink-2); }
+  .btn-ghost {
+    border:1px solid var(--line-2); background:transparent; color:var(--ink-2);
+    border-radius:7px; padding:5px 10px; font:inherit; font-size:.82rem; cursor:pointer;
+  }
+  .btn-ghost:hover { background:var(--card-2); }
+  @media (max-width:720px){ .topnav .hide-sm { display:none; } }
+
+  /* hero */
+  .hero { padding:72px 0 40px; }
+  .lede { font-size:1.22rem; color:var(--ink-2); max-width:62ch; }
+  .status-note {
+    display:flex; gap:10px; align-items:flex-start;
+    border:1px solid var(--line); border-left:3px solid var(--warning);
+    background:var(--card); border-radius:8px; padding:14px 16px;
+    font-size:.93rem; color:var(--ink-2); margin:28px 0 0;
+  }
+  .status-note strong { color:var(--ink); }
+
+  section { padding:52px 0; border-top:1px solid var(--line); }
+  section.plain { border-top:none; }
+  .eyebrow {
+    font-size:.75rem; text-transform:uppercase; letter-spacing:.09em;
+    color:var(--ink-3); font-weight:600; margin-bottom:10px;
+  }
+
+  .cards { display:grid; gap:16px; grid-template-columns:1fr 1fr; margin:24px 0; }
+  @media (max-width:680px){ .cards { grid-template-columns:1fr; } }
+  .card {
+    background:var(--card); border:1px solid var(--line); border-radius:10px; padding:20px;
+  }
+  .card h3 { margin-bottom:.4em; font-size:1.02rem; }
+  .card p { margin:0; font-size:.94rem; color:var(--ink-2); }
+
+  figure { margin:28px 0; }
+  figcaption { font-size:.85rem; color:var(--ink-3); text-align:center; margin-top:10px; }
+  .diagram { width:100%; height:auto; display:block; }
+
+  /* try it */
+  .tool {
+    background:var(--card); border:1px solid var(--line); border-radius:12px; overflow:hidden;
+  }
+  .tool-head { padding:20px 22px; border-bottom:1px solid var(--line); }
+  .tool-body { display:grid; grid-template-columns:minmax(0,1fr) minmax(0,380px); }
+  @media (max-width:980px){ .tool-body { grid-template-columns:1fr; } }
+  .form-pane { padding:22px; border-right:1px solid var(--line); }
+  @media (max-width:980px){ .form-pane { border-right:none; border-bottom:1px solid var(--line); } }
+  .result-pane { padding:22px; background:var(--card-2); }
+
+  .controls { display:flex; flex-wrap:wrap; gap:8px; align-items:center; }
+  .btn {
+    border:1px solid var(--line-2); background:var(--card); color:var(--ink);
+    border-radius:7px; padding:7px 12px; font:inherit; font-size:.85rem; cursor:pointer;
+  }
+  .btn:hover { border-color:var(--accent); color:var(--accent); }
+  .btn-primary { background:var(--accent); border-color:var(--accent); color:#fff; }
+  .btn-primary:hover { opacity:.9; color:#fff; }
+  select {
+    font:inherit; font-size:.85rem; padding:6px 10px; border-radius:7px;
+    border:1px solid var(--line-2); background:var(--card); color:var(--ink);
+  }
+
+  .group { border-top:1px solid var(--line); padding-top:16px; margin-top:20px; }
+  .group:first-of-type { border-top:none; }
+  .group-title { font-size:.78rem; text-transform:uppercase; letter-spacing:.08em; color:var(--ink-3); font-weight:600; }
+  .group-feeds { font-size:.78rem; color:var(--ink-3); font-weight:400; text-transform:none; letter-spacing:0; }
+
+  .q { margin:16px 0 0; }
+  .q > label.qlabel { display:block; font-size:.92rem; font-weight:550; margin-bottom:2px; }
+  .qnum { color:var(--ink-3); font-weight:600; font-family:var(--mono); font-size:.8rem; margin-right:6px; }
+  .qhelp { font-size:.82rem; color:var(--ink-3); margin:0 0 7px; }
+  .q select { width:100%; }
+  .q.conditional { border-left:2px solid var(--accent); padding-left:12px; }
+  .cond-tag {
+    font-size:.7rem; text-transform:uppercase; letter-spacing:.06em;
+    color:var(--accent); font-weight:600; margin-left:6px;
+  }
+  .multi { display:flex; flex-wrap:wrap; gap:6px; }
+  .chk {
+    display:inline-flex; align-items:center; gap:6px; font-size:.83rem;
+    border:1px solid var(--line-2); border-radius:20px; padding:4px 11px; cursor:pointer;
+    background:var(--card); color:var(--ink-2);
+  }
+  .chk input { margin:0; }
+  .chk:has(input:checked) { border-color:var(--accent); color:var(--accent); background:var(--accent-soft); }
+
+  /* results */
+  .verdict { border-radius:9px; padding:14px 16px; border:1px solid var(--line-2); background:var(--card); }
+  .verdict-label { font-size:.72rem; text-transform:uppercase; letter-spacing:.09em; color:var(--ink-3); font-weight:600; }
+  .verdict-value { font-size:1.15rem; font-weight:650; margin-top:3px; display:flex; align-items:center; gap:8px; }
+  .verdict[data-v="ship"] { border-left:3px solid var(--good); }
+  .verdict[data-v="conditions"] { border-left:3px solid var(--warning); }
+  .verdict[data-v="no"] { border-left:3px solid var(--critical); }
+
+  .bands { display:grid; gap:8px; margin:16px 0; }
+  .band { display:flex; align-items:center; gap:10px; font-size:.88rem; }
+  .band-name { width:98px; color:var(--ink-3); flex:none; font-size:.82rem; }
+  .band-meter { flex:1; display:flex; gap:2px; height:8px; }
+  .band-seg { flex:1; border-radius:2px; background:var(--line); }
+  .band-val { width:88px; flex:none; font-weight:600; display:flex; align-items:center; gap:5px; }
+  .glyph { font-family:var(--mono); font-size:.9em; flex:none; }
+
+  .res-h { font-size:.75rem; text-transform:uppercase; letter-spacing:.08em; color:var(--ink-3); font-weight:600; margin:20px 0 7px; }
+  .res-list { margin:0; padding-left:18px; font-size:.88rem; color:var(--ink-2); }
+  .res-list li { margin-bottom:6px; }
+  .rule-fired {
+    font-size:.85rem; border:1px solid var(--line-2); border-left:3px solid var(--critical);
+    background:var(--card); border-radius:7px; padding:10px 12px; margin-bottom:8px; color:var(--ink-2);
+  }
+  .rule-fired strong { color:var(--ink); }
+  .tag {
+    font-family:var(--mono); font-size:.72rem; text-transform:uppercase; letter-spacing:.04em;
+    border-radius:4px; padding:1px 5px; margin-right:6px; font-weight:600; border:1px solid;
+  }
+  .tag.stated  { color:var(--stated);  border-color:var(--stated); }
+  .tag.derived { color:var(--derived); border-color:var(--derived); }
+  .tag.unknown { color:var(--unknown); border-color:var(--unknown); }
+  .blocking { color:var(--critical); font-weight:600; }
+  .empty { font-size:.88rem; color:var(--ink-3); font-style:italic; }
+
+  table { width:100%; border-collapse:collapse; font-size:.9rem; margin:18px 0; }
+  th, td { text-align:left; padding:9px 10px; border-bottom:1px solid var(--line); vertical-align:top; }
+  th { font-size:.76rem; text-transform:uppercase; letter-spacing:.06em; color:var(--ink-3); font-weight:600; }
+  td.num { font-family:var(--mono); color:var(--ink-3); width:34px; }
+  .table-scroll { overflow-x:auto; }
+
+  details.disclosure { border:1px solid var(--line); border-radius:9px; background:var(--card); padding:0 18px; margin:12px 0; }
+  details.disclosure > summary { cursor:pointer; font-weight:600; padding:14px 0; font-size:.97rem; list-style:none; }
+  details.disclosure > summary::-webkit-details-marker { display:none; }
+  details.disclosure > summary::before { content:"+ "; color:var(--ink-3); font-family:var(--mono); }
+  details.disclosure[open] > summary::before { content:"− "; }
+  details.disclosure > div { padding-bottom:16px; }
+  details.disclosure p:last-child { margin-bottom:0; }
+
+  footer { border-top:1px solid var(--line); padding:36px 0 60px; color:var(--ink-3); font-size:.88rem; }
+  .sr { position:absolute; width:1px; height:1px; overflow:hidden; clip:rect(0 0 0 0); white-space:nowrap; }
+</style>
+</head>
+<body>
+
+<header class="top">
+  <div class="wrap wide topbar">
+    <span class="brand">AI Feature Risk Triage</span>
+    <nav class="topnav">
+      <a href="#try">Try it</a>
+      <a href="#dimensions" class="hide-sm">Dimensions</a>
+      <a href="#decisions" class="hide-sm">Decisions</a>
+      <a href="#standards" class="hide-sm">Standards</a>
+      <a href="https://github.com/jahlilshannon/ai-feature-risk-triage">GitHub</a>
+      <button class="btn-ghost" id="themeBtn" aria-label="Toggle colour theme">Dark</button>
+    </nav>
+  </div>
+</header>
+
+<main>
+
+<div class="wrap hero">
+  <h1>AI Feature Risk Triage</h1>
+  <p class="lede">Describe a proposed AI feature. Get an evidence-tagged assessment, a recommendation with conditions attached, and the list of questions a human still has to answer.</p>
+  <p class="lede" style="font-size:1rem;">It does not approve anything. It is not a compliance certification. It produces an argument that a person then agrees or disagrees with.</p>
+  <div class="status-note">
+    <span aria-hidden="true">▲</span>
+    <div><strong>Status: early.</strong> The scoring bands have not been tested against real features. The restaurant scenario is invented and illustrative. Treat every output as a starting point for a conversation, not a verdict.</div>
+  </div>
+</div>
+
+<section class="plain">
+  <div class="wrap">
+    <p class="eyebrow">The problem</p>
+    <h2>Most risk questionnaires produce the same report for every feature</h2>
+    <p>Boxes get ticked, a severity gets picked from a dropdown, and the output satisfies a process without telling anyone anything they did not already know. Two habits cause that.</p>
+    <div class="cards">
+      <div class="card">
+        <h3>Severity gets asserted, not derived</h3>
+        <p>Someone picks "High" because the feature feels important, and nothing connects that word to what actually happens when the feature is wrong. Once a rating is in a document it tends to stay there.</p>
+      </div>
+      <div class="card">
+        <h3>The assessment inherits the claim</h3>
+        <p>"No, this does not touch sensitive data" flows straight through to the conclusion, with no distinction between what was stated, what was inferred, and what nobody looked into.</p>
+      </div>
+    </div>
+    <p>This framework separates those three, and it makes severity something a team writes down <em>in advance</em> rather than chooses in the moment.</p>
+
+    <figure>
+      <svg class="diagram" viewBox="0 0 680 470" role="img" aria-labelledby="dgTitle dgDesc" xmlns="http://www.w3.org/2000/svg">
+        <title id="dgTitle">Feature risk triage assessment pipeline</title>
+        <desc id="dgDesc">A feature description enters a domain-neutral questionnaire, then scoring, which draws severity meaning from a swappable domain profile. Output splits into assessment, recommendation, and open questions for a human.</desc>
+        <style>
+          .dg-box{fill:var(--card);stroke:var(--line-2);stroke-width:1}
+          .dg-core{fill:var(--accent-soft);stroke:var(--accent);stroke-width:1}
+          .dg-seam{fill:none;stroke:var(--accent);stroke-width:1.5;stroke-dasharray:5 4}
+          .dg-t{fill:var(--ink);font:550 14px var(--sans)}
+          .dg-s{fill:var(--ink-3);font:400 12px var(--sans)}
+          .dg-l{stroke:var(--ink-3);stroke-width:1.5;fill:none}
+        </style>
+        <defs><marker id="ar" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse">
+          <path d="M2 1L8 5L2 9" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></marker></defs>
+        <g color="var(--ink-3)">
+        <rect class="dg-box" x="220" y="40" width="240" height="56" rx="8"/>
+        <text class="dg-t" x="340" y="65" text-anchor="middle">Feature description</text>
+        <text class="dg-s" x="340" y="83" text-anchor="middle">One way in</text>
+        <line class="dg-l" x1="340" y1="96" x2="340" y2="130" marker-end="url(#ar)"/>
+        <rect class="dg-core" x="220" y="136" width="240" height="56" rx="8"/>
+        <text class="dg-t" x="340" y="161" text-anchor="middle">Questionnaire</text>
+        <text class="dg-s" x="340" y="179" text-anchor="middle">17 neutral dimensions</text>
+        <line class="dg-l" x1="340" y1="192" x2="340" y2="226" marker-end="url(#ar)"/>
+        <rect class="dg-core" x="220" y="232" width="240" height="56" rx="8"/>
+        <text class="dg-t" x="340" y="257" text-anchor="middle">Scoring</text>
+        <text class="dg-s" x="340" y="275" text-anchor="middle">Three bands, four escalation rules</text>
+        <rect class="dg-seam" x="30" y="228" width="160" height="76" rx="8"/>
+        <text class="dg-t" x="110" y="252" text-anchor="middle">Domain profile</text>
+        <text class="dg-s" x="110" y="272" text-anchor="middle">What severe means</text>
+        <text class="dg-s" x="110" y="289" text-anchor="middle">One per industry</text>
+        <line class="dg-l" x1="190" y1="260" x2="214" y2="260" marker-end="url(#ar)"/>
+        <line class="dg-l" x1="340" y1="288" x2="340" y2="316"/>
+        <line class="dg-l" x1="140" y1="316" x2="540" y2="316"/>
+        <line class="dg-l" x1="140" y1="316" x2="140" y2="338" marker-end="url(#ar)"/>
+        <line class="dg-l" x1="340" y1="316" x2="340" y2="338" marker-end="url(#ar)"/>
+        <line class="dg-l" x1="540" y1="316" x2="540" y2="338" marker-end="url(#ar)"/>
+        <rect class="dg-box" x="50" y="344" width="180" height="56" rx="8"/>
+        <text class="dg-t" x="140" y="369" text-anchor="middle">Assessment</text>
+        <text class="dg-s" x="140" y="387" text-anchor="middle">By evidence type</text>
+        <rect class="dg-box" x="250" y="344" width="180" height="56" rx="8"/>
+        <text class="dg-t" x="340" y="369" text-anchor="middle">Recommendation</text>
+        <text class="dg-s" x="340" y="387" text-anchor="middle">Conditions attached</text>
+        <rect class="dg-box" x="450" y="344" width="180" height="56" rx="8"/>
+        <text class="dg-t" x="540" y="369" text-anchor="middle">Open questions</text>
+        <text class="dg-s" x="540" y="387" text-anchor="middle">A human answers</text>
+        <text class="dg-s" x="340" y="438" text-anchor="middle">Dashed border marks the swappable extension point</text>
+        </g>
+      </svg>
+      <figcaption>The assessment pipeline. One way in, three things out.</figcaption>
+    </figure>
+  </div>
+</section>
+
+<section id="try">
+  <div class="wrap wide">
+    <p class="eyebrow">Try it</p>
+    <h2>Run a feature through the framework</h2>
+    <p style="max-width:66ch;">Everything below runs in your browser. Nothing is sent anywhere and nothing is stored. Load one of the two worked examples to see the framework reach opposite conclusions about two features at the same company, which is the only real proof that it discriminates.</p>
+
+    <div class="tool">
+      <div class="tool-head">
+        <div class="controls">
+          <label for="profileSel" style="font-size:.85rem;color:var(--ink-3);">Domain profile</label>
+          <select id="profileSel">
+            <option value="restaurant">Restaurant platform (reference)</option>
+            <option value="k12">K-12 education software</option>
+          </select>
+          <span style="flex:1"></span>
+          <button class="btn" data-preset="allergen">Load: allergen chatbot</button>
+          <button class="btn" data-preset="forecaster">Load: prep forecaster</button>
+          <button class="btn" id="clearBtn">Clear</button>
+        </div>
+      </div>
+      <div class="tool-body">
+        <div class="form-pane" id="formPane"></div>
+        <aside class="result-pane" id="resultPane" aria-live="polite"></aside>
+      </div>
+    </div>
+  </div>
+</section>
+
+<section id="dimensions">
+  <div class="wrap">
+    <p class="eyebrow">The questionnaire</p>
+    <h2>Seventeen dimensions in five groups</h2>
+    <p>The questions are domain-neutral. What the answers <em>mean</em> is not, which is what the profile supplies. Dimensions 9 and 16 are conditional and only appear when an earlier answer triggers them.</p>
+    <div class="table-scroll"><table id="dimTable"><thead><tr><th>#</th><th>Dimension</th><th>What it establishes</th></tr></thead><tbody></tbody></table></div>
+
+    <details class="disclosure">
+      <summary>Why it grew from ten dimensions to seventeen</summary>
+      <div>
+        <p>The first draft had ten. Writing the allergen example broke four of them.</p>
+        <p>The risk driver in that example is stale menu data, and the original ten had no dimension that could have caught it. The framework would have missed, in its own showcase scenario, the exact thing the prose correctly identified. That produced dimension 10.</p>
+        <p>The same example takes free text from an anonymous diner, which is an untrusted channel into a generative model with access to a business record system, and nothing asked about that. That produced dimension 9.</p>
+        <p>The invoice scenario turns on volume and the resume scenario turns on whether the affected person can contest the outcome. Neither was representable. Those produced dimensions 5 and 8.</p>
+        <p>The remaining three are structural. Dimension 11 exists because the original questionnaire promised a likelihood rating while supplying no input that could derive one, which is precisely the failure this framework opens by criticizing. Dimension 16 exists because "data leaves the boundary" is not a risk statement until you know the contract it leaves under. Dimension 17 exists because an assessment with no named owner is a document, not a control.</p>
+        <p>Seventeen questions is a real cost, and long questionnaires get filled in badly or not at all. Two mitigations: two dimensions are conditional, and the group structure means a reviewer who reads nothing else can read Consequence and Visibility and get most of the answer.</p>
+      </div>
+    </details>
+  </div>
+</section>
+
+<section id="decisions">
+  <div class="wrap">
+    <p class="eyebrow">Design decisions</p>
+    <h2>The arguments, and what each one costs</h2>
+    <div id="decisionList"></div>
+  </div>
+</section>
+
+<section id="standards">
+  <div class="wrap">
+    <p class="eyebrow">Where this sits</p>
+    <h2>Against published standards</h2>
+    <p>This framework does not claim conformance with any of these. It is a triage step that runs earlier and cheaper than a formal assessment, built so its output can feed one. The questionnaire sits almost entirely inside the NIST AI RMF <strong>MAP</strong> function.</p>
+    <div class="table-scroll"><table><thead><tr><th>Document</th><th>What it is</th><th>Why it matters here</th></tr></thead><tbody>
+      <tr><td>NIST AI RMF 1.0<br><span class="mono" style="color:var(--ink-3)">AI 100-1, Jan 2023</span></td><td>Voluntary lifecycle framework: GOVERN, MAP, MEASURE, MANAGE</td><td>The reference vocabulary in the US. Everything here lives inside MAP</td></tr>
+      <tr><td>NIST Generative AI Profile<br><span class="mono" style="color:var(--ink-3)">AI 600-1, Jul 2024</span></td><td>Twelve named generative-AI risks</td><td>The closest published analogue to this framework's harm archetypes</td></tr>
+      <tr><td>ISO/IEC 42001:2023</td><td>Certifiable AI management system standard</td><td>Separates risk <em>to the organization</em> from impact <em>on individuals</em>. A cleaner split than a single severity axis</td></tr>
+      <tr><td>ISO/IEC 23894:2023</td><td>AI risk management guidance</td><td>The process companion: identify, analyze, evaluate, treat, monitor</td></tr>
+      <tr><td>OECD Classification Framework<br><span class="mono" style="color:var(--ink-3)">2022</span></td><td>Five dimensions for classifying AI systems</td><td>The closest peer, because it is explicitly a classification instrument</td></tr>
+      <tr><td>EU AI Act<br><span class="mono" style="color:var(--ink-3)">Reg. (EU) 2024/1689, as amended</span></td><td>Binding EU law, risk-tiered</td><td>The only binding instrument here, and the one where dates matter</td></tr>
+    </tbody></table></div>
+
+    <details class="disclosure">
+      <summary>The EU AI Act timeline changed in July 2026</summary>
+      <div>
+        <p>Regulation (EU) 2026/1744, the Digital Omnibus on AI, was adopted 8 July 2026 and entered into force 27 July 2026. It deferred the Annex III high-risk obligations from 2 August 2026 to <strong>2 December 2027</strong>, and Annex I from 2027 to <strong>2 August 2028</strong>. Transparency obligations under Article 50 did take effect on <strong>2 August 2026</strong>.</p>
+        <p>Cite the <a href="https://digital-strategy.ec.europa.eu/en/policies/regulatory-framework-ai">European Commission</a> or <a href="https://eur-lex.europa.eu/legal-content/EN/TXT/?uri=OJ:L_202601744">EUR-Lex</a>. Several widely-used secondary trackers still show the superseded pre-omnibus dates.</p>
+        <p style="color:var(--ink-3);font-size:.9rem;">Verified August 2026. Regulatory dates move. Check the primary source before relying on any of this.</p>
+      </div>
+    </details>
+
+    <h3 style="margin-top:32px;">What this framework adds</h3>
+    <p>Every document above requires that risk be assessed against criteria. None tells you how to establish the criteria, and in practice that is where assessments fail. The contribution here is narrow: <strong>severity meaning is written into the profile before any feature is assessed, by the team, where it can be reviewed and disagreed with later.</strong> Plus the evidence tagging, so a reader can tell which findings were asserted, which were derived, and which nobody checked. Neither is novel research. Both get skipped.</p>
+  </div>
+</section>
+
+<section>
+  <div class="wrap">
+    <p class="eyebrow">Limits</p>
+    <h2>What this is not</h2>
+    <p>Not a compliance certification, not a legal review, not a substitute for counsel. Not a gate, and it has no authority to approve anything.</p>
+    <p>The severity anchors are judgment written in advance by a team, so a profile written by someone with no incident history is a guess in a nicer format. The likelihood inputs are weak before a system exists, because evaluation coverage is usually unknown pre-build. And this covers pre-build triage only: no post-market monitoring, no incident response, no ongoing measurement.</p>
+    <p><strong>If it ever starts functioning as a rubber stamp, it has failed at the thing it was built for.</strong></p>
+  </div>
+</section>
+
+</main>
+
+<footer>
+  <div class="wrap wide">
+    <p>MIT licensed. Source, questionnaire, scoring rules, and standards crosswalk at <a href="https://github.com/jahlilshannon/ai-feature-risk-triage">github.com/jahlilshannon/ai-feature-risk-triage</a>.</p>
+    <p style="margin:0;">Built by Jahlil Shannon. The restaurant and education scenarios are invented and exist to show the framework reasoning, not to describe any real company or product.</p>
+  </div>
+</footer>
+
+<script>
+/* ============================================================
+   Rules as data. This mirrors core/questionnaire.yaml and
+   core/scoring.md in the repo. Single source of truth is the
+   YAML; this is generated from it by hand today, which is a
+   drift risk and is why the roadmap has a build step.
+   ============================================================ */
+
+const PROFILES = {
+  restaurant: {
+    label: "Restaurant platform",
+    archetypes: {
+      physical_harm:  { label:"Physical harm (allergen, foodborne)", severity:3 },
+      legal_exposure: { label:"Legal exposure (wage, payment, disclosure)", severity:2 },
+      financial_loss: { label:"Financial loss (forecasting, ordering, pricing)", severity:1 },
+      reputational:   { label:"Reputational (public-facing output is wrong)", severity:1 }
+    },
+    sensitive: "Payment data, wage and scheduling data, health inspection records, supplier terms, customer contact data, allergen and ingredient data.",
+    audienceNote: "The paying customer is the operator. The diner is the end consumer. Conflating them is the most common error in this domain."
+  },
+  k12: {
+    label: "K-12 education software",
+    archetypes: {
+      academic_consequence:    { label:"Academic consequence (placement, intervention, grading)", severity:2 },
+      student_data_disclosure: { label:"Student data disclosure", severity:2 },
+      disparate_impact:        { label:"Disparate impact across student groups", severity:3 },
+      operational_disruption:  { label:"Operational disruption (scheduling, rostering)", severity:1 }
+    },
+    sensitive: "Student records, assessment data, IEP and intervention records, family contact data, staff employment data.",
+    audienceNote: "The paying customer is the district. The teacher is the operator. The student is the affected party and never chose to be there."
+  }
+};
+
+const SEVERITY    = ["Negligible","Moderate","Serious","Severe"];
+const LIKELIHOOD  = ["Rare","Occasional","Frequent"];
+const DETECT      = ["High","Moderate","Low"];
+
+const GROUPS = [
+  { id:"shape",       title:"Shape",       feeds:"what the system actually is" },
+  { id:"consequence", title:"Consequence", feeds:"feeds severity" },
+  { id:"likelihood",  title:"Likelihood",  feeds:"feeds likelihood" },
+  { id:"visibility",  title:"Visibility",  feeds:"feeds detectability" },
+  { id:"controls",    title:"Controls and governance", feeds:"" }
+];
+
+const DIMS = [
+  { n:1,  id:"data_exposure", group:"shape", q:"Does any of the data the model sees leave your trust boundary?",
+    help:"List what is actually in the prompt and the context window. “No PII” is not an answer.",
+    establishes:"What the model sees, where it came from, whether it leaves the trust boundary",
+    opts:[["no","No, everything stays inside"],["yes_metadata_only","Yes, metadata only"],["yes_content","Yes, content leaves"]] },
+  { n:2,  id:"model_behavior", group:"shape", q:"Is the output constrained, or can the model produce something nobody anticipated?",
+    establishes:"Constrained or generative; can it produce output nobody anticipated",
+    opts:[["constrained_lookup","Constrained lookup"],["constrained_generation","Constrained generation"],["open_generation","Open generation"],["agentic_multistep","Agentic, multi-step"]] },
+  { n:3,  id:"autonomy", group:"shape", q:"Does it produce output for a person, or take action in a system?",
+    establishes:"Produces output, or takes action",
+    opts:[["produces_output","Produces output only"],["recommends_action","Recommends an action"],["takes_action_reversible","Takes action, reversible"],["takes_action_irreversible","Takes action, irreversible"]] },
+  { n:4,  id:"audience", group:"shape", q:"Who is affected by the output?", multi:true,
+    help:"Not the same question as who sees it. Select everyone the output lands on.",
+    establishes:"Internal staff, business customer, end consumer, or a third party who never interacts with it",
+    opts:[["internal_staff","Internal staff"],["business_customer","Business customer"],["end_consumer","End consumer"],["third_party_no_interaction","Third party who never interacts with it"]] },
+  { n:5,  id:"exposure_volume", group:"shape", q:"What stage is the rollout, and at what volume?",
+    help:"Volume is a likelihood multiplier, not a severity one. One miscoded invoice is nothing. Ten thousand is a restatement.",
+    establishes:"Decisions per day, people affected per day, pilot or general availability",
+    opts:[["prototype","Prototype"],["limited_pilot","Limited pilot"],["staged_rollout","Staged rollout"],["general_availability","General availability"]] },
+
+  { n:6,  id:"failure_mode", group:"consequence", q:"What is the worst realistic outcome when this is wrong?",
+    help:"Not the worst conceivable one. Pick the harm archetype the profile defines.",
+    establishes:"The worst realistic outcome when it is wrong", archetype:true, opts:[] },
+  { n:7,  id:"reversibility", group:"consequence", q:"Once the wrong output has had its effect, can the effect be undone?",
+    establishes:"Whether the effect can be undone",
+    opts:[["trivially_reversible","Trivially reversible"],["reversible_with_effort","Reversible with effort"],["partially_reversible","Partially reversible"],["irreversible","Irreversible"]] },
+  { n:8,  id:"contestability", group:"consequence", q:"Can the affected person find out, object, and reach a human who can change it?",
+    help:"Distinct from reversibility. A system can be perfectly reversible and completely uncontestable.",
+    establishes:"Whether the affected person can find out, object, and reach a human",
+    opts:[["yes","Yes, there is a stated appeal path"],["partial","Partially, no formal path"],["no","No, they never find out"]] },
+
+  { n:9,  id:"input_trust", group:"likelihood", q:"Who can put text into this, and does any of them have an incentive to manipulate it?",
+    conditional:"Shown because data leaves the trust boundary",
+    establishes:"Whether any input channel is open to a party with an incentive to manipulate it",
+    opts:[["all_inputs_trusted","All inputs come from trusted parties"],["untrusted_input_constrained","Untrusted input, constrained format"],["untrusted_input_freeform","Untrusted free-form input"]] },
+  { n:10, id:"upstream_data", group:"likelihood", q:"How fresh is the data this system reasons over, and who owns its accuracy?",
+    help:"A model can be perfectly accurate against data that is wrong. Ask how a change in the real world reaches the record the system reads.",
+    establishes:"Freshness, ownership, and accuracy of the data the system reasons over",
+    opts:[["realtime","Real time, owned"],["daily","Daily, owned"],["weekly_or_worse","Weekly or worse"],["no_defined_sla","No defined freshness SLA"]] },
+  { n:11, id:"evaluation_coverage", group:"likelihood", q:"What has it been tested against, and what error rate was observed?",
+    help:"“Unknown” is the honest and common answer before anything is built. Record it rather than skipping it.",
+    establishes:"What it has been tested against, the observed error rate, what has not been tested",
+    opts:[["ongoing_eval","Tested, with ongoing evaluation"],["tested_once","Tested once at build"],["minimal","Minimal or ad hoc testing"],["none","Not tested"]] },
+
+  { n:12, id:"detectability", group:"visibility", q:"If it produced a wrong output right now, how would you find out?",
+    establishes:"Whether you would know it was wrong, and how fast",
+    opts:[["automated_immediate","Automated, immediately"],["automated_delayed","Automated, on a delay"],["human_review_catches","A human reviewer catches it"],["user_complaint_only","Only if a user complains"],["incident_only","Only from an incident"],["no_mechanism","No mechanism at all"]] },
+  { n:13, id:"provenance", group:"visibility", q:"Six months from now, can you reconstruct why it produced a specific output?",
+    establishes:"Whether you can reconstruct why it produced what it did",
+    opts:[["full_reconstruction","Full reconstruction"],["partial","Partial"],["output_only","Output logged only"],["nothing_retained","Nothing retained"]] },
+
+  { n:14, id:"human_in_loop", group:"controls", q:"Does a human review output before it has effect?",
+    help:"A reviewer with no accountability and no time produces rubber-stamping, which scores as review and functions as none.",
+    establishes:"Reviewed always, sampled, or never",
+    opts:[["every_output_accountable","Every output, reviewer is accountable"],["every_output_unaccountable","Every output, but nobody is accountable"],["sampled_review","Sampled review"],["exception_review_only","Exceptions only"],["no_review","No review"]] },
+  { n:15, id:"disclosure", group:"controls", q:"Does the person receiving the output know an AI system produced it?",
+    establishes:"Whether the person knows AI is involved",
+    opts:[["explicit_disclosure","Explicitly disclosed"],["discoverable","Discoverable if they look"],["not_disclosed","Not disclosed"]] },
+  { n:16, id:"vendor_terms", group:"controls", q:"Who processes this data, under what terms?",
+    conditional:"Shown because data leaves the trust boundary",
+    establishes:"Provider, training-on-input, retention, processing region, subprocessors",
+    opts:[["reviewed_no_training","Reviewed contract, no training on inputs"],["reviewed_retention_unclear","Reviewed, but retention is unclear"],["standard_terms_unreviewed","Standard terms, nobody reviewed them"],["unknown","Unknown"]] },
+  { n:17, id:"accountable_owner", group:"controls", q:"After this assessment is filed, who owns the risk?",
+    help:"A named person, not a team. An assessment with no owner is a document, not a control.",
+    establishes:"Who owns the risk, who reviews it, who can override a “do not ship”",
+    opts:[["named_owner_cadence","Named owner with a review cadence"],["named_owner_no_cadence","Named owner, no review cadence"],["team_only","A team, nobody specific"],["nobody","Nobody yet"]] }
+];
+
+const PRESETS = {
+  allergen: { _profile:"restaurant",
+    data_exposure:"yes_content", model_behavior:"open_generation", autonomy:"produces_output",
+    audience:["business_customer","end_consumer"], exposure_volume:"general_availability",
+    failure_mode:"physical_harm", reversibility:"irreversible", contestability:"no",
+    input_trust:"untrusted_input_freeform", upstream_data:"no_defined_sla", evaluation_coverage:"none",
+    detectability:"incident_only", provenance:"output_only",
+    human_in_loop:"no_review", disclosure:"not_disclosed", vendor_terms:"standard_terms_unreviewed",
+    accountable_owner:"nobody" },
+  forecaster: { _profile:"restaurant",
+    data_exposure:"no", model_behavior:"constrained_generation", autonomy:"recommends_action",
+    audience:["internal_staff","business_customer"], exposure_volume:"staged_rollout",
+    failure_mode:"financial_loss", reversibility:"trivially_reversible", contestability:"yes",
+    upstream_data:"daily", evaluation_coverage:"tested_once",
+    detectability:"automated_delayed", provenance:"full_reconstruction",
+    human_in_loop:"every_output_accountable", disclosure:"explicit_disclosure",
+    accountable_owner:"named_owner_cadence" }
+};
+
+const DECISIONS = [
+  ["Bands, not scores",
+   "Severity, likelihood, and detectability resolve to bands rather than a number out of 100. A composite score implies a precision the inputs do not support, and it invites the worst behaviour in this category, which is tuning inputs until the number clears a threshold.",
+   "The cost is real: bands are harder to trend over time and harder to put on a dashboard. That tradeoff is deliberate."],
+  ["It can say do not ship",
+   "Always with conditions attached. Something that can only ever say “proceed with caution” is decoration, and something that says no without a path forward gets removed within a quarter.",
+   "The allergen case is the shape: a clear no, plus a specific change that turns it into a yes."],
+  ["Unknown is a state, not a severity",
+   "The obvious move is to treat anything unknown as high risk. That is safer on paper and wrong in practice, because it collapses “we checked and it is bad” into “nobody looked,” and those need different responses from different people.",
+   "The cost is that a team can proceed with unknowns outstanding, so unknowns surface as blocking or non-blocking rather than disappearing into a rating."],
+  ["Severity anchors are written in advance",
+   "By the team, in the profile, before any feature is assessed. Not chosen during the assessment. A profile has to state what each harm archetype means for that business first.",
+   "This is the part most questionnaires skip, and skipping it is why their severity ratings mean nothing."],
+  ["Undetectable severe harm escalates on its own",
+   "This started as an accident of the scoring and is now a stated rule. Maximum severity with good detectability is a manageable feature. Maximum severity with no detectability is the one that ends up in a news story.",
+   "Those are not the same risk, and averaging them together hides the difference."],
+  ["Assessments expire",
+   "Valid for twelve months or until a trigger event, whichever comes first: model or version change, prompt change, a new data source, changed vendor terms, an expansion of audience or volume, or any incident.",
+   "Without this, the artifact describes a system that no longer exists."],
+  ["Two extension points, not three",
+   "The domain profile is swappable and the severity anchor source is swappable. Intake is not. Feature descriptions go in one way, with no plugin layer for web forms and ticket systems.",
+   "Every additional seam is a promise to maintain something nobody has asked for yet."]
+];
+
+/* ---------------- state ---------------- */
+const state = { profile:"restaurant", answers:{} };
+
+/* ---------------- rendering ---------------- */
+const $ = s => document.querySelector(s);
+const el = (t,c,txt) => { const e=document.createElement(t); if(c) e.className=c; if(txt!=null) e.textContent=txt; return e; };
+
+function conditionalsActive() {
+  return state.answers.data_exposure && state.answers.data_exposure !== "no";
+}
+
+function visibleDims() {
+  return DIMS.filter(d => !d.conditional || conditionalsActive());
+}
+
+function archetypeOpts() {
+  const p = PROFILES[state.profile];
+  return Object.entries(p.archetypes).map(([k,v]) => [k, v.label]);
+}
+
+function renderForm() {
+  const pane = $("#formPane");
+  pane.innerHTML = "";
+  GROUPS.forEach(g => {
+    const dims = visibleDims().filter(d => d.group === g.id);
+    if (!dims.length) return;
+    const gd = el("div","group");
+    const h = el("div","group-title");
+    h.append(document.createTextNode(g.title));
+    if (g.feeds) { const s = el("span","group-feeds"," · " + g.feeds); h.append(s); }
+    gd.append(h);
+    dims.forEach(d => gd.append(renderQ(d)));
+    pane.append(gd);
+  });
+}
+
+function renderQ(d) {
+  const wrap = el("div","q" + (d.conditional ? " conditional" : ""));
+  const lab = el("label","qlabel");
+  lab.htmlFor = "f_" + d.id;
+  const num = el("span","qnum", String(d.n).padStart(2,"0"));
+  lab.append(num, document.createTextNode(d.q));
+  if (d.conditional) lab.append(el("span","cond-tag","conditional"));
+  wrap.append(lab);
+  if (d.help) wrap.append(el("p","qhelp", d.help));
+  if (d.conditional) wrap.append(el("p","qhelp", d.conditional));
+
+  if (d.multi) {
+    const box = el("div","multi");
+    d.opts.forEach(([v,l]) => {
+      const c = el("label","chk");
+      const i = document.createElement("input");
+      i.type="checkbox"; i.value=v;
+      i.checked = (state.answers[d.id]||[]).includes(v);
+      i.addEventListener("change", () => {
+        const cur = new Set(state.answers[d.id]||[]);
+        i.checked ? cur.add(v) : cur.delete(v);
+        state.answers[d.id] = [...cur];
+        update();
+      });
+      c.append(i, document.createTextNode(l));
+      box.append(c);
+    });
+    wrap.append(box);
+  } else {
+    const sel = document.createElement("select");
+    sel.id = "f_" + d.id;
+    const opts = d.archetype ? archetypeOpts() : d.opts;
+    sel.append(new Option("Not answered, record as unknown",""));
+    opts.forEach(([v,l]) => sel.append(new Option(l,v)));
+    sel.value = state.answers[d.id] || "";
+    sel.addEventListener("change", () => {
+      if (sel.value) state.answers[d.id] = sel.value; else delete state.answers[d.id];
+      if (d.id === "data_exposure") renderForm();
+      update();
+    });
+    wrap.append(sel);
+  }
+  return wrap;
+}
+
+/* ---------------- scoring ---------------- */
+const W = {
+  model_behavior:      { constrained_lookup:0, constrained_generation:1, open_generation:2, agentic_multistep:3 },
+  exposure_volume:     { prototype:0, limited_pilot:1, staged_rollout:2, general_availability:3 },
+  input_trust:         { all_inputs_trusted:0, untrusted_input_constrained:1, untrusted_input_freeform:2 },
+  upstream_data:       { realtime:0, daily:1, weekly_or_worse:2, no_defined_sla:3 },
+  evaluation_coverage: { ongoing_eval:0, tested_once:1, minimal:2, none:3 },
+  detectability:       { automated_immediate:0, automated_delayed:1, human_review_catches:1, user_complaint_only:3, incident_only:4, no_mechanism:4 },
+  provenance:          { full_reconstruction:0, partial:1, output_only:2, nothing_retained:3 },
+  reversibility:       { trivially_reversible:0, reversible_with_effort:1, partially_reversible:2, irreversible:3 }
+};
+const MAXW = { model_behavior:3, exposure_volume:3, input_trust:2, upstream_data:3, evaluation_coverage:3, detectability:4, provenance:3 };
+
+function score() {
+  const a = state.answers, P = PROFILES[state.profile];
+  const unknowns = visibleDims().filter(d => {
+    const v = a[d.id];
+    return d.multi ? !(v && v.length) : !v;
+  });
+
+  // severity from the profile anchor
+  let sev = null;
+  if (a.failure_mode && P.archetypes[a.failure_mode]) sev = P.archetypes[a.failure_mode].severity;
+
+  // likelihood
+  const lkKeys = ["model_behavior","exposure_volume","input_trust","upstream_data","evaluation_coverage"];
+  let lkPts = 0, lkMax = 0;
+  lkKeys.forEach(k => {
+    if (k === "input_trust" && !conditionalsActive()) return;
+    lkMax += MAXW[k];
+    if (a[k] != null && W[k][a[k]] != null) lkPts += W[k][a[k]];
+  });
+  const lkPct = lkMax ? lkPts / lkMax : 0;
+  let lk = lkPct >= 0.60 ? 2 : lkPct >= 0.33 ? 1 : 0;
+
+  // detectability (inverted: higher points = worse = "Low")
+  let dtPts = 0, dtMax = MAXW.detectability + MAXW.provenance;
+  ["detectability","provenance"].forEach(k => { if (a[k] != null && W[k][a[k]] != null) dtPts += W[k][a[k]]; });
+  const dtPct = dtPts / dtMax;
+  let dt = dtPct >= 0.60 ? 2 : dtPct >= 0.30 ? 1 : 0;
+
+  // rule 4: unaccountable review is not a mitigating control
+  const rules = [], conditions = [];
+  if (a.human_in_loop === "every_output_unaccountable") {
+    rules.push(["Unaccountable review","Every output is reviewed but nobody is accountable for what they approve. The review does not count as a mitigating control until that is resolved."]);
+    if (dt < 2) dt = Math.min(2, dt + 1);
+  }
+
+  // rule 3: volume amplification
+  if (sev != null && sev >= 1 && a.exposure_volume === "general_availability" && dt === 2 && lk < 2) {
+    lk = Math.min(2, lk + 1);
+    rules.push(["Volume amplification","Moderate-or-worse severity at general availability with low detectability. Likelihood is treated as one band higher than derived."]);
+  }
+
+  // rule 2: no recourse on an affected third party
+  const aud = a.audience || [];
+  let escalated = false;
+  if ((aud.includes("third_party_no_interaction") || aud.includes("end_consumer")) && (a.contestability === "no" || !a.contestability)) {
+    rules.push(["No recourse on an affected party","The output lands on someone who cannot find out it happened or object to it. Escalated one band, with a blocking open question."]);
+    escalated = true;
+  }
+
+  // rule 1: undetectable severe harm
+  const revBad = a.reversibility === "partially_reversible" || a.reversibility === "irreversible";
+  let verdict, vkey;
+  const rule1 = (sev === 3 && dt === 2 && revBad);
+  if (rule1) rules.unshift(["Undetectable severe harm","Severity is Severe, detectability is Low, and the effect cannot be fully undone. This escalates regardless of how the other fourteen dimensions answer."]);
+
+  if (sev == null) { verdict = "Cannot assess"; vkey = "conditions"; }
+  else if (rule1) { verdict = "Do not ship as designed"; vkey = "no"; }
+  else if (sev >= 2 || escalated || lk === 2 || dt === 2 || a.human_in_loop === "no_review") { verdict = "Ship with conditions"; vkey = "conditions"; }
+  else { verdict = "Ship"; vkey = "ship"; }
+
+  // conditions derived from the weak dimensions
+  if (a.upstream_data === "no_defined_sla" || a.upstream_data === "weekly_or_worse")
+    conditions.push("Define a freshness SLA and a named owner for the upstream data, and document how a real-world change reaches the record the system reads.");
+  if (a.input_trust === "untrusted_input_freeform" && (a.model_behavior === "open_generation" || a.model_behavior === "agentic_multistep"))
+    conditions.push("Bound the answer contract so an untrusted free-form input cannot elicit an unbounded generative response. Constrain what the system is permitted to affirm.");
+  if (dt === 2)
+    conditions.push("Add a detection mechanism before general availability. Right now a wrong output is found by incident or complaint, which is too late to be a control.");
+  if (a.provenance === "nothing_retained" || a.provenance === "output_only")
+    conditions.push("Log inputs, model and prompt version, and outputs with a stated retention period, so a specific output can be reconstructed later.");
+  if (a.contestability === "no" || a.contestability === "partial")
+    conditions.push("Give the affected person a stated route to find out an AI system was involved and reach a human who can change the outcome.");
+  if (a.human_in_loop === "no_review" && sev != null && sev >= 2)
+    conditions.push("Introduce review proportionate to the severity band, with a reviewer who is accountable for what they approve.");
+  if (a.human_in_loop === "every_output_unaccountable")
+    conditions.push("Name who is accountable for approved output, and give the reviewer enough time that review is not rubber-stamping.");
+  if (a.evaluation_coverage === "none" || a.evaluation_coverage === "minimal")
+    conditions.push("Establish an evaluation set and an observed error rate before rollout widens. Untested is not the same as working.");
+  if (a.vendor_terms === "standard_terms_unreviewed" || a.vendor_terms === "unknown")
+    conditions.push("Have someone read the processing terms: training on inputs, retention period, processing region, and subprocessors.");
+  if (a.disclosure === "not_disclosed" && (aud.includes("end_consumer") || aud.includes("third_party_no_interaction")))
+    conditions.push("Disclose that an AI system is involved to the person receiving the output.");
+  if (a.accountable_owner === "nobody" || a.accountable_owner === "team_only")
+    conditions.push("Name a person who owns this risk, a review cadence, and who can override a do-not-ship.");
+
+  // open questions
+  const blocking = [], nonBlocking = [];
+  unknowns.forEach(d => {
+    const decisive = ["failure_mode","reversibility","contestability","upstream_data","detectability"].includes(d.id);
+    const line = "Dimension " + d.n + ": " + d.q;
+    (decisive ? blocking : nonBlocking).push(line);
+  });
+  if (escalated && !blocking.some(b => b.includes("Dimension 8")))
+    blocking.push("Who is accountable for the affected party's recourse, and what is the stated appeal path?");
+
+  return { sev, lk, dt, verdict, vkey, rules, conditions, blocking, nonBlocking, unknowns };
+}
+
+/* ---------------- result rendering ---------------- */
+const BAND_COLOR = {
+  sev:["var(--good)","var(--warning)","var(--serious)","var(--critical)"],
+  lk: ["var(--good)","var(--warning)","var(--critical)"],
+  dt: ["var(--good)","var(--warning)","var(--critical)"]
+};
+const GLYPH = { 0:"●", 1:"◐", 2:"◑", 3:"●" };
+
+function bandRow(name, idx, labels, colors) {
+  const row = el("div","band");
+  row.append(el("span","band-name",name));
+  const meter = el("div","band-meter");
+  meter.setAttribute("aria-hidden","true");
+  labels.forEach((_,i) => {
+    const seg = el("div","band-seg");
+    if (idx != null && i <= idx) seg.style.background = colors[idx];
+    meter.append(seg);
+  });
+  row.append(meter);
+  const val = el("div","band-val");
+  if (idx == null) { val.style.color="var(--ink-3)"; val.append(document.createTextNode("not set")); }
+  else {
+    const g = el("span","glyph", GLYPH[idx] || "●");
+    g.style.color = colors[idx];
+    val.append(g, document.createTextNode(labels[idx]));
+  }
+  row.append(val);
+  return row;
+}
+
+function renderResult() {
+  const pane = $("#resultPane");
+  pane.innerHTML = "";
+  const r = score();
+  const answered = visibleDims().length - r.unknowns.length;
+
+  const v = el("div","verdict"); v.dataset.v = r.vkey;
+  v.append(el("div","verdict-label","Recommendation"));
+  const vv = el("div","verdict-value");
+  vv.append(el("span","glyph", r.vkey==="ship" ? "✓" : r.vkey==="no" ? "✕" : "!"));
+  vv.append(document.createTextNode(r.verdict));
+  v.append(vv);
+  if (r.sev == null) v.append(el("p","empty","Answer dimension 6 to establish a harm archetype. Severity comes from the profile, never from the assessment."));
+  pane.append(v);
+
+  const bands = el("div","bands");
+  bands.append(bandRow("Severity",      r.sev, SEVERITY,   BAND_COLOR.sev));
+  bands.append(bandRow("Likelihood",    r.sev==null?null:r.lk, LIKELIHOOD, BAND_COLOR.lk));
+  bands.append(bandRow("Detectability", r.sev==null?null:r.dt, DETECT,     BAND_COLOR.dt));
+  pane.append(bands);
+
+  pane.append(el("div","res-h","Escalation rules fired"));
+  if (r.rules.length) r.rules.forEach(([t,d]) => {
+    const b = el("div","rule-fired");
+    b.append(el("strong",null,t), document.createTextNode(". " + d));
+    pane.append(b);
+  });
+  else pane.append(el("p","empty","None."));
+
+  pane.append(el("div","res-h","Conditions"));
+  if (r.conditions.length) {
+    const ul = el("ul","res-list");
+    r.conditions.forEach(c => ul.append(el("li",null,c)));
+    pane.append(ul);
+  } else pane.append(el("p","empty", r.sev==null ? "Answer dimension 6 first." : "None. Specific changes only, never “be careful.”"));
+
+  pane.append(el("div","res-h","Open questions"));
+  if (r.blocking.length || r.nonBlocking.length) {
+    const ul = el("ul","res-list");
+    r.blocking.forEach(q => { const li=el("li"); li.append(el("span","blocking","Blocking. "), document.createTextNode(q)); ul.append(li); });
+    r.nonBlocking.forEach(q => { const li=el("li"); li.append(el("span",null,"Non-blocking. "), document.createTextNode(q)); ul.append(li); });
+    pane.append(ul);
+  } else pane.append(el("p","empty","None outstanding."));
+
+  pane.append(el("div","res-h","Evidence"));
+  const ev = el("p",null);
+  ev.style.fontSize=".86rem"; ev.style.color="var(--ink-2)"; ev.style.margin="0 0 10px";
+  const t1=el("span","tag stated","stated"), t2=el("span","tag derived","derived"), t3=el("span","tag unknown","unknown");
+  ev.append(t1, document.createTextNode(answered + " answered  "), t2, document.createTextNode("bands and rules  "), t3, document.createTextNode(r.unknowns.length + " not checked"));
+  pane.append(ev);
+
+  const dl = el("button","btn btn-primary","Download assessment (.md)");
+  dl.addEventListener("click", downloadMd);
+  pane.append(dl);
+
+  const note = el("p","empty");
+  note.style.marginTop="12px";
+  note.textContent = "Expires 12 months from assessment, or on any trigger event: model or version change, prompt change, new data source, changed vendor terms, expanded audience or volume, or any incident.";
+  pane.append(note);
+}
+
+function downloadMd() {
+  const r = score(), a = state.answers, P = PROFILES[state.profile];
+  const L = [];
+  L.push("# Risk triage: (name this feature)");
+  L.push("");
+  L.push("Profile: " + P.label + " | Questionnaire v2.0 | Assessed (date) | Expires (date + 12 months)");
+  L.push("");
+  L.push("## Recommendation");
+  L.push("");
+  L.push("**" + r.verdict + "**");
+  L.push("");
+  L.push("## Risk profile");
+  L.push("");
+  L.push("- Harm archetype: " + (a.failure_mode ? P.archetypes[a.failure_mode].label : "not established"));
+  L.push("- Severity: " + (r.sev==null?"unknown":SEVERITY[r.sev]));
+  L.push("- Likelihood: " + (r.sev==null?"unknown":LIKELIHOOD[r.lk]));
+  L.push("- Detectability: " + (r.sev==null?"unknown":DETECT[r.dt]));
+  L.push("");
+  L.push("Escalation rules fired: " + (r.rules.length ? "" : "none"));
+  r.rules.forEach(([t,d]) => L.push("- **" + t + ".** " + d));
+  L.push("");
+  L.push("## Assessment");
+  L.push("");
+  visibleDims().forEach(d => {
+    const val = a[d.id];
+    let tag, text;
+    if (d.multi) {
+      if (val && val.length) { tag="stated"; text = val.map(v => (d.opts.find(o=>o[0]===v)||[,v])[1]).join(", "); }
+      else { tag="unknown"; text="not answered"; }
+    } else if (val) {
+      tag="stated";
+      const opts = d.archetype ? archetypeOpts() : d.opts;
+      text = (opts.find(o=>o[0]===val)||[,val])[1];
+    } else { tag="unknown"; text="not answered"; }
+    L.push("- **" + String(d.n).padStart(2,"0") + " " + d.establishes + "** [" + tag + "] " + text);
+  });
+  L.push("");
+  L.push("Severity band is [derived] from the profile's anchor for the selected harm archetype. Likelihood and detectability bands are [derived] from the dimensions listed in core/scoring.md.");
+  L.push("");
+  L.push("## Conditions");
+  L.push("");
+  if (r.conditions.length) r.conditions.forEach(c => L.push("- " + c)); else L.push("None.");
+  L.push("");
+  L.push("## Open questions");
+  L.push("");
+  if (r.blocking.length) { L.push("**Blocking** (resolving these either way would change the recommendation):"); L.push(""); r.blocking.forEach(q => L.push("- " + q)); L.push(""); }
+  if (r.nonBlocking.length) { L.push("**Non-blocking:**"); L.push(""); r.nonBlocking.forEach(q => L.push("- " + q)); L.push(""); }
+  if (!r.blocking.length && !r.nonBlocking.length) L.push("None outstanding.");
+  L.push("");
+  L.push("## Reassessment");
+  L.push("");
+  L.push("Expires 12 months from assessment, or on any of: model or model version change, prompt or system instruction change, new or changed upstream data source, change to vendor terms or retention or processing region, expansion of audience or a material increase in volume, or any incident involving this feature.");
+  L.push("");
+  L.push("---");
+  L.push("");
+  L.push("Generated by AI Feature Risk Triage. Not a compliance certification, not a legal review, not a gate.");
+
+  const blob = new Blob([L.join("\n")], {type:"text/markdown"});
+  const url = URL.createObjectURL(blob);
+  const a2 = document.createElement("a");
+  a2.href = url; a2.download = "risk-triage-assessment.md";
+  document.body.append(a2); a2.click(); a2.remove();
+  setTimeout(() => URL.revokeObjectURL(url), 1000);
+}
+
+/* ---------------- static sections ---------------- */
+function renderDimTable() {
+  const tb = $("#dimTable tbody");
+  DIMS.forEach(d => {
+    const tr = el("tr");
+    tr.append(el("td","num", String(d.n).padStart(2,"0")));
+    const name = el("td");
+    name.append(document.createTextNode(d.establishes.split(",")[0].length > 46 ? d.id.replace(/_/g," ") : ({
+      data_exposure:"Data exposure", model_behavior:"Model behavior", autonomy:"Autonomy",
+      audience:"Audience and affected parties", exposure_volume:"Exposure volume",
+      failure_mode:"Failure mode", reversibility:"Reversibility", contestability:"Contestability and recourse",
+      input_trust:"Input trust", upstream_data:"Upstream data dependency", evaluation_coverage:"Evaluation coverage",
+      detectability:"Detectability", provenance:"Provenance", human_in_loop:"Human in the loop",
+      disclosure:"Disclosure", vendor_terms:"Vendor and processing terms", accountable_owner:"Accountable owner and escalation"
+    })[d.id]));
+    if (d.conditional) name.append(el("span","cond-tag","conditional"));
+    tr.append(name);
+    tr.append(el("td",null,d.establishes));
+    tb.append(tr);
+  });
+}
+
+function renderDecisions() {
+  const box = $("#decisionList");
+  DECISIONS.forEach(([t,body,cost]) => {
+    const d = document.createElement("details");
+    d.className = "disclosure";
+    const s = document.createElement("summary"); s.textContent = t;
+    const inner = el("div");
+    inner.append(el("p",null,body));
+    const c = el("p",null,cost); c.style.color="var(--ink-3)"; c.style.fontSize=".93rem";
+    inner.append(c);
+    d.append(s, inner);
+    box.append(d);
+  });
+}
+
+/* ---------------- wiring ---------------- */
+function update() { renderResult(); }
+
+$("#profileSel").addEventListener("change", e => {
+  state.profile = e.target.value;
+  delete state.answers.failure_mode;
+  renderForm(); update();
+});
+document.querySelectorAll("[data-preset]").forEach(b => {
+  b.addEventListener("click", () => {
+    const p = {...PRESETS[b.dataset.preset]};
+    state.profile = p._profile; delete p._profile;
+    $("#profileSel").value = state.profile;
+    state.answers = p;
+    renderForm(); update();
+    const narrow = window.matchMedia("(max-width:980px)").matches;
+    (narrow ? document.getElementById("resultPane") : document.getElementById("try"))
+      .scrollIntoView({behavior:"smooth", block:"start"});
+  });
+});
+$("#clearBtn").addEventListener("click", () => { state.answers = {}; renderForm(); update(); });
+
+const themeBtn = $("#themeBtn");
+function applyTheme(t) {
+  document.documentElement.dataset.theme = t;
+  themeBtn.textContent = t === "dark" ? "Light" : "Dark";
+}
+themeBtn.addEventListener("click", () =>
+  applyTheme(document.documentElement.dataset.theme === "dark" ? "light" : "dark"));
+applyTheme(window.matchMedia && window.matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light");
+
+renderForm(); renderDimTable(); renderDecisions(); update();
+</script>
+</body>
+</html>
