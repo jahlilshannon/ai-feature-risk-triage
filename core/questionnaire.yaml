@@ -1,0 +1,188 @@
+# AI Feature Risk Triage: core questionnaire
+# Domain-neutral. What the answers MEAN is supplied by the domain profile.
+# Every answer carries an evidence tag: stated | derived | unknown.
+
+version: "2.0"
+updated: "2026-08-19"
+evidence_tags: [stated, derived, unknown]
+
+groups:
+
+  - id: shape
+    title: Shape. What the system actually is.
+    dimensions:
+
+      - id: data_exposure
+        n: 1
+        question: What data does the model see, where did it come from, and does any of it leave your trust boundary?
+        capture: [data_classes, source_systems, leaves_boundary]
+        type: enum+list
+        options_leaves_boundary: [no, yes_metadata_only, yes_content]
+        triggers:
+          vendor_terms: "leaves_boundary != no"
+        notes: >
+          Name the data classes explicitly. The profile decides which are sensitive.
+          "No PII" is not an answer; list what is actually in the prompt and the context window.
+
+      - id: model_behavior
+        n: 2
+        question: Is the output constrained to a known set, or can the model produce something nobody anticipated?
+        type: enum
+        options: [constrained_lookup, constrained_generation, open_generation, agentic_multistep]
+
+      - id: autonomy
+        n: 3
+        question: Does it produce output for a person, or does it take action in a system?
+        type: enum
+        options: [produces_output, recommends_action, takes_action_reversible, takes_action_irreversible]
+
+      - id: audience
+        n: 4
+        question: Who sees the output, and separately, who is affected by it?
+        capture: [sees_output, affected_parties]
+        type: multi
+        options: [internal_staff, business_customer, end_consumer, third_party_no_interaction]
+        notes: >
+          These are two different questions and conflating them is the most common error
+          this questionnaire catches. In the resume screening case, the recruiter sees the
+          output and the candidate is affected by it. In the restaurant case the operator
+          is the paying customer and the diner is the exposed party.
+
+      - id: exposure_volume
+        n: 5
+        question: How many decisions or outputs per day, how many people affected per day, and is this a pilot or general availability?
+        capture: [decisions_per_day, people_affected_per_day, rollout_stage]
+        type: numeric+enum
+        options_rollout_stage: [prototype, limited_pilot, staged_rollout, general_availability]
+        notes: >
+          Volume is a likelihood multiplier, not a severity one. One miscoded invoice is
+          nothing. Ten thousand is a restatement. Same severity per event, different risk.
+
+  - id: consequence
+    title: Consequence. Feeds severity.
+    dimensions:
+
+      - id: failure_mode
+        n: 6
+        question: What is the worst realistic outcome when this is wrong? Not the worst conceivable one.
+        capture: [description, harm_archetype]
+        type: text+profile_enum
+        notes: >
+          harm_archetype must be one the profile defines. If nothing in the profile fits,
+          the profile is incomplete and that is a finding in itself.
+
+      - id: reversibility
+        n: 7
+        question: Once the wrong output has had its effect, can the effect be undone, by whom, and how fast?
+        type: enum
+        options: [trivially_reversible, reversible_with_effort, partially_reversible, irreversible]
+
+      - id: contestability
+        n: 8
+        question: Can the affected person find out an AI system was involved, object to the outcome, and reach a human who can change it?
+        capture: [can_discover, can_object, human_can_override, stated_appeal_path]
+        type: enum_each
+        options: [yes, partial, no, unknown]
+        notes: >
+          Distinct from reversibility. Reversibility asks whether the effect CAN be undone.
+          Contestability asks whether the person it happened to has any route to undoing it.
+          A system can be perfectly reversible and completely uncontestable.
+
+  - id: likelihood
+    title: Likelihood. Feeds likelihood.
+    dimensions:
+
+      - id: input_trust
+        n: 9
+        conditional_on: "any input channel accepts free-form input from a party outside the organization"
+        question: Who can put text or data into this, and does any of them have an incentive to manipulate it?
+        capture: [untrusted_channels, injection_surface, tested_against_adversarial_input]
+        type: enum
+        options: [all_inputs_trusted, untrusted_input_constrained, untrusted_input_freeform]
+
+      - id: upstream_data
+        n: 10
+        question: How fresh, how accurate, and whose responsibility is the data this system reasons over?
+        capture: [freshness_sla, accuracy_owner, update_path, known_staleness_modes]
+        type: text+enum
+        options_freshness: [realtime, hourly, daily, weekly_or_worse, no_defined_sla]
+        notes: >
+          A model can be perfectly accurate against data that is wrong. Ask specifically
+          how a change in the real world reaches the record the system reads, and how long
+          that takes. If nobody owns accuracy, that is the finding.
+
+      - id: evaluation_coverage
+        n: 11
+        question: What has it been tested against, what error rate was observed, and what has not been tested?
+        capture: [test_sets, observed_error_rate, untested_scenarios, eval_is_ongoing]
+        type: text+numeric
+        notes: >
+          "Unknown" is the honest and common answer pre-build. Record it as unknown rather
+          than skipping it, because it is a blocking unknown for anything in a high band.
+
+  - id: visibility
+    title: Visibility. Feeds detectability.
+    dimensions:
+
+      - id: detectability
+        n: 12
+        question: If it produced a wrong output right now, how would you find out, and how long would that take?
+        capture: [detection_mechanism, time_to_detect, who_notices_first]
+        type: enum
+        options: [automated_immediate, automated_delayed, human_review_catches, user_complaint_only, incident_only, no_mechanism]
+
+      - id: provenance
+        n: 13
+        question: Six months from now, can you reconstruct why it produced a specific output?
+        capture: [logs_inputs, logs_outputs, logs_model_version, logs_prompt_version, retention_period]
+        type: enum
+        options: [full_reconstruction, partial, output_only, nothing_retained]
+
+  - id: controls
+    title: Controls and governance.
+    dimensions:
+
+      - id: human_in_loop
+        n: 14
+        question: Does a human review output before it has effect, always, on a sample, or never?
+        capture: [review_mode, sample_rate, reviewer_accountable]
+        type: enum
+        options: [every_output_reviewed, sampled_review, exception_review_only, no_review]
+        notes: >
+          Ask whether the reviewer is accountable for what they approve. A reviewer with no
+          accountability and no time produces rubber-stamping, which scores as review and
+          functions as none.
+
+      - id: disclosure
+        n: 15
+        question: Does the person receiving the output know an AI system produced it?
+        type: enum
+        options: [explicit_disclosure, discoverable, not_disclosed, actively_obscured]
+
+      - id: vendor_terms
+        n: 16
+        conditional_on: "data_exposure.leaves_boundary != no"
+        question: Who processes this data, under what terms?
+        capture: [provider, model_and_version, trains_on_inputs, retention_period, processing_region, subprocessors, contract_reviewed_by]
+        type: structured
+
+      - id: accountable_owner
+        n: 17
+        question: After this assessment is filed, who owns the risk, who reviews it, and who can override a "do not ship"?
+        capture: [risk_owner, review_cadence, escalation_path, override_authority]
+        type: structured
+        notes: >
+          A named person, not a team. An assessment with no owner is a document, not a control.
+
+lifecycle:
+  expiry_months: 12
+  reassessment_triggers:
+    - model or model version change
+    - prompt or system instruction change
+    - new or changed upstream data source
+    - change to vendor terms, retention, or processing region
+    - expansion of audience or a material increase in volume
+    - any incident involving this feature
+  notes: >
+    Whichever comes first. Without expiry the assessment describes a system that no longer
+    exists, and the audit record becomes archival rather than useful.
