@@ -1,0 +1,29 @@
+# K-12 profile. The student is affected and never chose to be there.
+name: Reading-group placement recommender
+profile: k12
+assessor: Example Team
+system:
+  model: example-vendor/general-chat-2026-05
+  vendor: example-vendor, education addendum
+  prompt: prompts/reading-placement.txt
+  data_sources: [assessment_scores, roster]
+answers:
+  data_exposure: yes_content
+  model_behavior: constrained_generation
+  autonomy: recommends_action
+  audience: [business_customer, third_party_no_interaction]
+  exposure_volume: limited_pilot
+  failure_mode: disparate_impact
+  reversibility: partially_reversible
+  contestability: partial
+  input_trust: all_inputs_trusted
+  upstream_data: weekly_or_worse
+  evaluation_coverage: minimal
+  detectability: human_review_catches
+  provenance: partial
+  human_in_loop: every_output_accountable
+  disclosure: discoverable
+  vendor_terms: reviewed_no_training
+  accountable_owner: named_owner_no_cadence
+notes:
+  failure_mode: Students from one group are placed in lower reading groups at a higher rate for the same scores.

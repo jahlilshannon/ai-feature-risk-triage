@@ -1,0 +1,28 @@
+# Looks harmless, is not: the people affected never learn they were affected.
+name: Line-cook resume screening assistant
+profile: restaurant
+assessor: Example Team
+system:
+  model: example-vendor/general-chat-2026-05
+  vendor: example-vendor, enterprise terms
+  data_sources: [applicant_tracking_system]
+answers:
+  data_exposure: yes_content
+  model_behavior: constrained_generation
+  autonomy: recommends_action
+  audience: [internal_staff, third_party_no_interaction]
+  exposure_volume: general_availability
+  failure_mode: legal_exposure
+  reversibility: partially_reversible
+  contestability: "no"
+  input_trust: untrusted_input_freeform
+  upstream_data: daily
+  evaluation_coverage: minimal
+  detectability: no_mechanism
+  provenance: partial
+  human_in_loop: every_output_unaccountable
+  disclosure: not_disclosed
+  vendor_terms: reviewed_retention_unclear
+  accountable_owner: team_only
+notes:
+  failure_mode: The ranking systematically downranks a group. Each ranking looks reasonable on its own.

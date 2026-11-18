@@ -1,0 +1,30 @@
+# The README's worked example. Expected: do not ship as designed.
+name: Diner allergen chatbot
+profile: restaurant
+assessor: Example Team
+system:
+  model: example-vendor/general-chat-2026-05
+  vendor: example-vendor, standard API terms
+  prompt: prompts/allergen-chatbot.txt
+  data_sources: [menu_ingredients_db]
+answers:
+  data_exposure: yes_content
+  model_behavior: open_generation
+  autonomy: produces_output
+  audience: [business_customer, end_consumer]
+  exposure_volume: general_availability
+  failure_mode: physical_harm
+  reversibility: irreversible
+  contestability: "no"
+  input_trust: untrusted_input_freeform
+  upstream_data: no_defined_sla
+  evaluation_coverage: none
+  detectability: incident_only
+  provenance: output_only
+  human_in_loop: no_review
+  disclosure: not_disclosed
+  vendor_terms: standard_terms_unreviewed
+  accountable_owner: nobody
+notes:
+  failure_mode: A diner with a severe allergy is told a dish is safe when it is not.
+  upstream_data: Kitchen substitutions on a busy night never reach the ingredient record the bot reads.

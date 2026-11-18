@@ -1,0 +1,22 @@
+{
+  "spec": "examples/invoice-coding.yaml",
+  "name": "Automated supplier invoice coding",
+  "assessed": "2026-11-18",
+  "expires": "2027-11-18",
+  "assessor": "Example Team",
+  "questionnaire": "2.0",
+  "verdict": "Ship",
+  "bands": {
+    "severity": "Moderate",
+    "likelihood": "Occasional",
+    "detectability": "High"
+  },
+  "rules_fired": [],
+  "fingerprints": {
+    "answers": "399684468c5be89c",
+    "scoring rules": "398eef2e90a95f5e",
+    "model": "in-house/invoice-classifier-v2",
+    "data source: supplier_invoices": "98db67057dbdaa67",
+    "data source: general_ledger": "e55e493940172a2c"
+  }
+}

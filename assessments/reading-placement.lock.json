@@ -1,0 +1,24 @@
+{
+  "spec": "examples/reading-placement.yaml",
+  "name": "Reading-group placement recommender",
+  "assessed": "2026-11-18",
+  "expires": "2027-11-18",
+  "assessor": "Example Team",
+  "questionnaire": "2.0",
+  "verdict": "Ship with conditions",
+  "bands": {
+    "severity": "Severe",
+    "likelihood": "Occasional",
+    "detectability": "High"
+  },
+  "rules_fired": [],
+  "fingerprints": {
+    "answers": "9ad490a9173fb04b",
+    "scoring rules": "398eef2e90a95f5e",
+    "model": "example-vendor/general-chat-2026-05",
+    "vendor": "example-vendor, education addendum",
+    "prompt: prompts/reading-placement.txt": "ad525b318ccedf8d",
+    "data source: assessment_scores": "85827f1b52075154",
+    "data source: roster": "c6836f7ad1c4da8a"
+  }
+}

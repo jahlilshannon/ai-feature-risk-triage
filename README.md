@@ -4,7 +4,7 @@ A reference framework for assessing the risk of a proposed AI feature before it 
 
 You describe a feature. It produces an assessment, a recommendation, and a list of what a human still has to decide. It does not approve anything, and it is not a compliance certification.
 
-**Status: design specification and reference profile. The scoring engine is not built yet.** What is in this repo today is the questionnaire, the profile schema, the scoring rules, and two worked examples. See [Roadmap](#roadmap) for what is next and [Status](#status) for what has already changed my mind.
+**Status: working engine, untested against real features.** The questionnaire, the scoring rules, a dependency-free engine shared by the website and a CLI, five worked examples, and a CI check that fails when an assessment goes stale. See [Run it](#run-it) to use it, [Roadmap](#roadmap) for what is next and [Status](#status) for what has already changed my mind.
 
 The restaurant scenario throughout is illustrative. It exists to show the framework doing something non-obvious, not to describe any real company or product.
 
@@ -47,6 +47,48 @@ The risk driver turns out not to be the model. It is menu data staleness. The ki
 Run the same framework against a prep-quantity forecaster at the same company and it comes back low risk, ship it. Historical sales in, no PII, a manager approves every order, it recommends rather than orders, and a bad forecast shows up in inventory within a day and gets fixed on the next one.
 
 Two features, one company, one framework, opposite answers. Something that flags everything is indistinguishable from something that flags nothing.
+
+---
+
+## Run it
+
+Three ways in, one engine. The website, the CLI and the GitHub Action all load [`docs/triage.js`](docs/triage.js), so they cannot disagree.
+
+**In the browser.** The [live site](https://ai-feature-risk-triage.netlify.app/#try) scores answers as you pick them, draws the feature on a severity by detectability map, and computes the **path to yes**: the smallest set of design changes that moves the verdict up a tier. Only design levers are searched (model behavior, rollout stage, input channel, data freshness, evaluation, detection, logging, recourse, review). Facts about the world, such as the harm archetype, who is affected, and whether the effect can be undone, are never offered as levers.
+
+**On the command line.** Node 18 or later, no dependencies.
+
+```
+npx github:jahlilshannon/ai-feature-risk-triage assess examples/allergen-chatbot.yaml
+```
+
+A spec is a short YAML file: a name, a profile, the answers, and optionally the system it describes (model, vendor, prompt files, data sources). See [`examples/`](examples/allergen-chatbot.yaml), run `triage options` for every valid answer, or use **Export spec for CI** on the site. `assess` writes four files to `assessments/`: the report, the risk map, a README badge, and a lock file.
+
+**In CI.** The lock file is the part nothing else does. It records fingerprints of every reassessment trigger the framework names: the model, the vendor, each prompt file, each data source, the answers, and the scoring rules themselves. `triage check` recomputes them and fails when any has drifted, naming what changed:
+
+```
+STALE allergen-chatbot
+      prompt changed: prompts/allergen-chatbot.txt
+STALE resume-screening
+      model changed: example-vendor/general-chat-2026-05 -> example-vendor/general-chat-2026-09
+```
+
+Add it to any repository:
+
+```yaml
+# .github/workflows/ai-risk.yml
+on: pull_request
+jobs:
+  ai-risk:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: jahlilshannon/ai-feature-risk-triage@main
+        with:
+          specs: ai-features/*.yaml
+```
+
+"Assessments expire" stops being a sentence in a policy and becomes a failing check on the pull request that changed the prompt.
 
 ---
 
@@ -181,32 +223,45 @@ The short version: the questionnaire sits almost entirely inside the NIST AI RMF
 
 ```
 README.md
-LICENSE
+SKILL.md                   run the triage conversationally
+action.yml                 the GitHub Action (triage check)
+package.json
+bin/
+  triage.mjs               CLI: assess, check, options
 core/
   questionnaire.yaml       the seventeen dimensions, with conditionals
-  profile.schema.yaml      what a domain profile must supply
   scoring.md               band definitions and the escalation rules
-docs/
-  pipeline.svg
+docs/                      the website (published by Netlify)
+  index.html
+  triage.js                the engine: rules, scoring, path to yes, renderers
   crosswalk.md             mapping to NIST, ISO, OECD, EU AI Act
-profiles/
-  restaurant/profile.yaml
-  k12-education/profile.yaml
+  pipeline.svg
 examples/
-  allergen-chatbot.yaml    high risk, obvious
-  prep-forecaster.yaml     low risk, shows the framework discriminates
+  allergen-chatbot.yaml    do not ship, obvious
+  prep-forecaster.yaml     ship, shows the framework discriminates
+  resume-screening.yaml    looks harmless, needs conditions
+  invoice-coding.yaml      takes action, saved by reversibility
+  reading-placement.yaml   K-12 profile
+  prompts/                 system prompts the lock files fingerprint
+assessments/               generated: report, risk map, badge, lock file per example
+test/
+  engine.test.mjs
 ```
 
-Two examples matter more than they look. One that screams and one that shrugs proves the tool discriminates.
+Two examples matter more than they look. One that screams and one that shrugs proves the tool discriminates. A regression test fails if the prep forecaster ever comes back high.
+
+The two domain profiles currently live inside `docs/triage.js`. Moving them out to `profiles/*.yaml` is on the roadmap.
 
 ---
 
 ## Roadmap
 
-- [ ] `core/assess.py`, the orchestrator, plus `profile_interface.py` and `risk_data_interface.py`
-- [ ] Scoring implementation and the escalation rule as a test
-- [ ] Test suite and CI, including a regression test that the prep forecaster never comes back high
-- [ ] `SKILL.md` so the assessment can be run conversationally rather than by editing YAML
+- [x] Scoring implementation and the escalation rules as tests (`docs/triage.js`, shared by the site and the CLI)
+- [x] Test suite and CI, including a regression test that the prep forecaster never comes back high
+- [x] `SKILL.md` so the assessment can be run conversationally rather than by editing YAML
+- [x] Path to yes: the smallest design change that moves the verdict up a tier
+- [x] Lock files and `triage check`, so an assessment goes stale in CI when the model, prompt, data, answers or rules change
+- [ ] Move the profiles out of the engine into `profiles/*.yaml`, with a schema
 - [ ] A third profile contributed by someone who is not me, which is the only real proof the seam works
 
 ---
@@ -228,6 +283,8 @@ Two things have shifted so far.
 **Detectability is doing more work than severity.** I expected severity to dominate the recommendation. Working through the allergen case on paper, detectability turned out to matter more. Maximum severity with good detectability is a manageable feature. Maximum severity with no detectability is the one that ends up in a news story. That interaction was emergent from the scoring and is now an explicit escalation rule, which is where it should have been from the start.
 
 **My own worked example broke my own questionnaire.** The risk driver in the allergen case is stale menu data, and the original ten dimensions had no way to represent it. The framework would have missed, in the scenario written to showcase it, the thing the prose correctly identified. Three more scenarios broke three more dimensions. That is how the questionnaire got to seventeen, and it is the strongest argument I have for why a framework needs worked examples before it needs code.
+
+**The engine found a hole in the rules on its first run.** The path-to-yes search reported that the allergen chatbot clears "do not ship" if it logs everything. That is wrong: logs help you reconstruct a hospitalization, they do not prevent one. The scoring blended provenance into the detectability band, so enough logging diluted it below Low. Rule 1 now also fires whenever dimension 12 says the only way you would find out is a complaint, an incident, or nothing, and a test holds it there. The search now gives the answer the prose always gave: add a way to catch a wrong answer before it is eaten.
 
 Whether any of it holds once real features run through it is an open question.
 

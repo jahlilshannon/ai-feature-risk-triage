@@ -1,0 +1,18 @@
+name: AI Feature Risk Triage check
+description: Fail the build when an AI feature's risk assessment is missing, expired, or stale because its model, prompt, data sources or answers changed.
+branding:
+  icon: shield
+  color: orange
+inputs:
+  specs:
+    description: Space-separated spec files or globs, for example "ai-features/*.yaml".
+    required: true
+  out:
+    description: Directory holding the lock files written by "triage assess".
+    default: assessments
+runs:
+  using: composite
+  steps:
+    - name: Check risk assessments
+      shell: bash
+      run: node "$GITHUB_ACTION_PATH/bin/triage.mjs" check ${{ inputs.specs }} --out "${{ inputs.out }}"

@@ -1,0 +1,14 @@
+{
+  "name": "ai-feature-risk-triage",
+  "version": "0.3.0",
+  "description": "Pre-ship risk triage for AI features: evidence-tagged assessments, a computed path to yes, and assessments that go stale in CI when the model, prompt or data changes.",
+  "license": "MIT",
+  "bin": { "triage": "bin/triage.mjs" },
+  "scripts": {
+    "test": "node --test test/*.test.mjs",
+    "assess": "node bin/triage.mjs assess examples/*.yaml",
+    "check": "node bin/triage.mjs check examples/*.yaml"
+  },
+  "engines": { "node": ">=18" },
+  "files": ["bin/", "docs/triage.js", "core/", "examples/"]
+}

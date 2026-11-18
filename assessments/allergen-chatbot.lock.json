@@ -1,0 +1,26 @@
+{
+  "spec": "examples/allergen-chatbot.yaml",
+  "name": "Diner allergen chatbot",
+  "assessed": "2026-11-18",
+  "expires": "2027-11-18",
+  "assessor": "Example Team",
+  "questionnaire": "2.0",
+  "verdict": "Do not ship as designed",
+  "bands": {
+    "severity": "Severe",
+    "likelihood": "Frequent",
+    "detectability": "Low"
+  },
+  "rules_fired": [
+    "Undetectable severe harm",
+    "No recourse on an affected party"
+  ],
+  "fingerprints": {
+    "answers": "113b659bd9be6708",
+    "scoring rules": "398eef2e90a95f5e",
+    "model": "example-vendor/general-chat-2026-05",
+    "vendor": "example-vendor, standard API terms",
+    "prompt: prompts/allergen-chatbot.txt": "4b130c91dd6ee05c",
+    "data source: menu_ingredients_db": "074e87bcdd245c0c"
+  }
+}
