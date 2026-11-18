@@ -1,0 +1,29 @@
+name: checks
+on:
+  pull_request:
+    branches: [main]
+permissions:
+  contents: read
+jobs:
+  guardrails:
+    name: guardrails
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Banned terms and style
+        run: |
+          if grep -rnIiE -f .github/banned-patterns.txt --include='*.html' --include='*.md' --exclude-dir=.github . ; then
+            echo "::error::Banned term found (see matches above). Rules live in .github/banned-patterns.txt."
+            exit 1
+          fi
+          echo "No banned terms."
+  links:
+    name: links
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Check local links, images and files (site and docs)
+        uses: lycheeverse/lychee-action@v2
+        with:
+          args: --offline --no-progress './**/*.html' './**/*.md'
+          fail: true
