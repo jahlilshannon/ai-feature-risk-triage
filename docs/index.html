@@ -154,6 +154,24 @@
   .verdict[data-v="conditions"] { border-left:3px solid var(--warning); }
   .verdict[data-v="no"] { border-left:3px solid var(--critical); }
 
+  .riskmap { margin:4px 0 6px; }
+  .riskmap svg { width:100%; height:auto; display:block; }
+  .yes-step { border:1px solid var(--line-2); border-radius:9px; background:var(--card); padding:12px 14px; margin:0 0 10px; }
+  .yes-step[data-v="ship"] { border-left:3px solid var(--good); }
+  .yes-step[data-v="conditions"] { border-left:3px solid var(--warning); }
+  .yes-h { font-weight:650; font-size:.92rem; display:flex; align-items:center; gap:8px; }
+  .yes-n { width:20px; height:20px; border-radius:50%; background:var(--ink); color:var(--card); font-size:.72rem; display:inline-grid; place-items:center; flex:none; }
+  .yes-change { display:grid; grid-template-columns:1fr auto; gap:2px 10px; border-top:1px solid var(--line); margin-top:10px; padding-top:10px; }
+  .yes-dim { grid-column:1; font-family:var(--mono); font-size:.74rem; color:var(--ink-3); text-transform:uppercase; letter-spacing:.04em; }
+  .yes-move { grid-column:1; font-size:.88rem; }
+  .yes-move s { color:var(--ink-3); }
+  .yes-hint { grid-column:1; font-size:.8rem; color:var(--ink-3); margin:2px 0 0; }
+  .yes-apply { grid-column:2; grid-row:1 / span 3; align-self:center; padding:5px 10px; font-size:.8rem; }
+  .yes-ceiling { font-size:.84rem; color:var(--ink-2); border-left:2px solid var(--line-2); padding-left:10px; margin:4px 0 14px; }
+  .term { background:#141413; color:#e8e6df; border-radius:10px; padding:16px 18px; font-family:var(--mono); font-size:.8rem; line-height:1.55; overflow-x:auto; white-space:pre; margin:0 0 18px; }
+  .term .g { color:#5fd35f; } .term .r { color:#ff6b6b; } .term .y { color:#f5c451; } .term .d { color:#8d8b82; }
+  .ci-grid { display:grid; grid-template-columns:repeat(3,minmax(0,1fr)); gap:14px; margin:0 0 22px; }
+  @media (max-width:760px){ .ci-grid { grid-template-columns:1fr; } }
   .bands { display:grid; gap:8px; margin:16px 0; }
   .band { display:flex; align-items:center; gap:10px; font-size:.88rem; }
   .band-name { width:98px; color:var(--ink-3); flex:none; font-size:.82rem; }
@@ -205,6 +223,7 @@
     <span class="brand">AI Feature Risk Triage</span>
     <nav class="topnav">
       <a href="#try">Try it</a>
+      <a href="#ci">CI</a>
       <a href="#dimensions" class="hide-sm">Dimensions</a>
       <a href="#decisions" class="hide-sm">Decisions</a>
       <a href="#standards" class="hide-sm">Standards</a>
@@ -324,6 +343,40 @@
   </div>
 </section>
 
+<section id="ci">
+  <div class="wrap">
+    <p class="eyebrow">Triage as code</p>
+    <h2>An assessment that goes stale when the system changes</h2>
+    <p>The framework says an assessment expires on a model change, a prompt change, a new data source, or after twelve months. A PDF cannot enforce that. A lock file can.</p>
+    <div class="ci-grid">
+      <div class="card"><h3>1. Describe</h3><p>A short YAML spec next to the code: the answers above, plus the model, the prompt file and the data sources. Use <strong>Export spec for CI</strong> to start one from this page.</p></div>
+      <div class="card"><h3>2. Assess</h3><p><code>triage assess</code> writes the report, the risk map, a README badge, and a lock file of fingerprints for every reassessment trigger.</p></div>
+      <div class="card"><h3>3. Gate</h3><p><code>triage check</code> runs on every pull request and fails when a fingerprint drifts, naming exactly what changed.</p></div>
+    </div>
+<pre class="term" aria-label="Example triage check output"><span class="d">$ npx triage check ai-features/*.yaml</span>
+<span class="r">STALE</span> allergen-chatbot
+      prompt changed: prompts/allergen-chatbot.txt
+<span class="g">ok   </span> prep-forecaster  <span class="d">Ship, expires 2027-11-18</span>
+<span class="r">STALE</span> resume-screening
+      model changed: general-chat-2026-05 -> general-chat-2026-09
+
+2 assessments are stale. Reassess, review the diff in the report,
+and commit the new lock file.</pre>
+    <p>Add it to any repository as a GitHub Action:</p>
+<pre class="term"><span class="d"># .github/workflows/ai-risk.yml</span>
+on: pull_request
+jobs:
+  ai-risk:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: jahlilshannon/ai-feature-risk-triage@main
+        with:
+          specs: ai-features/*.yaml</pre>
+    <p style="color:var(--ink-3);font-size:.93rem;">No dependencies, Node 18 or later. The CLI and this page load the same engine file, <a href="triage.js"><code>triage.js</code></a>, so they cannot disagree. Source and examples on <a href="https://github.com/jahlilshannon/ai-feature-risk-triage">GitHub</a>.</p>
+  </div>
+</section>
+
 <section id="dimensions">
   <div class="wrap">
     <p class="eyebrow">The questionnaire</p>
@@ -400,137 +453,12 @@
   </div>
 </footer>
 
+<script src="triage.js"></script>
 <script>
-/* ============================================================
-   Rules as data. This mirrors core/questionnaire.yaml and
-   core/scoring.md in the repo. Single source of truth is the
-   YAML; this is generated from it by hand today, which is a
-   drift risk and is why the roadmap has a build step.
-   ============================================================ */
-
-const PROFILES = {
-  restaurant: {
-    label: "Restaurant platform",
-    archetypes: {
-      physical_harm:  { label:"Physical harm (allergen, foodborne)", severity:3 },
-      legal_exposure: { label:"Legal exposure (wage, payment, disclosure)", severity:2 },
-      financial_loss: { label:"Financial loss (forecasting, ordering, pricing)", severity:1 },
-      reputational:   { label:"Reputational (public-facing output is wrong)", severity:1 }
-    },
-    sensitive: "Payment data, wage and scheduling data, health inspection records, supplier terms, customer contact data, allergen and ingredient data.",
-    audienceNote: "The paying customer is the operator. The diner is the end consumer. Conflating them is the most common error in this domain."
-  },
-  k12: {
-    label: "K-12 education software",
-    archetypes: {
-      academic_consequence:    { label:"Academic consequence (placement, intervention, grading)", severity:2 },
-      student_data_disclosure: { label:"Student data disclosure", severity:2 },
-      disparate_impact:        { label:"Disparate impact across student groups", severity:3 },
-      operational_disruption:  { label:"Operational disruption (scheduling, rostering)", severity:1 }
-    },
-    sensitive: "Student records, assessment data, IEP and intervention records, family contact data, staff employment data.",
-    audienceNote: "The paying customer is the district. The teacher is the operator. The student is the affected party and never chose to be there."
-  }
-};
-
-const SEVERITY    = ["Negligible","Moderate","Serious","Severe"];
-const LIKELIHOOD  = ["Rare","Occasional","Frequent"];
-const DETECT      = ["High","Moderate","Low"];
-
-const GROUPS = [
-  { id:"shape",       title:"Shape",       feeds:"what the system actually is" },
-  { id:"consequence", title:"Consequence", feeds:"feeds severity" },
-  { id:"likelihood",  title:"Likelihood",  feeds:"feeds likelihood" },
-  { id:"visibility",  title:"Visibility",  feeds:"feeds detectability" },
-  { id:"controls",    title:"Controls and governance", feeds:"" }
-];
-
-const DIMS = [
-  { n:1,  id:"data_exposure", group:"shape", q:"Does any of the data the model sees leave your trust boundary?",
-    help:"List what is actually in the prompt and the context window. “No PII” is not an answer.",
-    establishes:"What the model sees, where it came from, whether it leaves the trust boundary",
-    opts:[["no","No, everything stays inside"],["yes_metadata_only","Yes, metadata only"],["yes_content","Yes, content leaves"]] },
-  { n:2,  id:"model_behavior", group:"shape", q:"Is the output constrained, or can the model produce something nobody anticipated?",
-    establishes:"Constrained or generative; can it produce output nobody anticipated",
-    opts:[["constrained_lookup","Constrained lookup"],["constrained_generation","Constrained generation"],["open_generation","Open generation"],["agentic_multistep","Agentic, multi-step"]] },
-  { n:3,  id:"autonomy", group:"shape", q:"Does it produce output for a person, or take action in a system?",
-    establishes:"Produces output, or takes action",
-    opts:[["produces_output","Produces output only"],["recommends_action","Recommends an action"],["takes_action_reversible","Takes action, reversible"],["takes_action_irreversible","Takes action, irreversible"]] },
-  { n:4,  id:"audience", group:"shape", q:"Who is affected by the output?", multi:true,
-    help:"Not the same question as who sees it. Select everyone the output lands on.",
-    establishes:"Internal staff, business customer, end consumer, or a third party who never interacts with it",
-    opts:[["internal_staff","Internal staff"],["business_customer","Business customer"],["end_consumer","End consumer"],["third_party_no_interaction","Third party who never interacts with it"]] },
-  { n:5,  id:"exposure_volume", group:"shape", q:"What stage is the rollout, and at what volume?",
-    help:"Volume is a likelihood multiplier, not a severity one. One miscoded invoice is nothing. Ten thousand is a restatement.",
-    establishes:"Decisions per day, people affected per day, pilot or general availability",
-    opts:[["prototype","Prototype"],["limited_pilot","Limited pilot"],["staged_rollout","Staged rollout"],["general_availability","General availability"]] },
-
-  { n:6,  id:"failure_mode", group:"consequence", q:"What is the worst realistic outcome when this is wrong?",
-    help:"Not the worst conceivable one. Pick the harm archetype the profile defines.",
-    establishes:"The worst realistic outcome when it is wrong", archetype:true, opts:[] },
-  { n:7,  id:"reversibility", group:"consequence", q:"Once the wrong output has had its effect, can the effect be undone?",
-    establishes:"Whether the effect can be undone",
-    opts:[["trivially_reversible","Trivially reversible"],["reversible_with_effort","Reversible with effort"],["partially_reversible","Partially reversible"],["irreversible","Irreversible"]] },
-  { n:8,  id:"contestability", group:"consequence", q:"Can the affected person find out, object, and reach a human who can change it?",
-    help:"Distinct from reversibility. A system can be perfectly reversible and completely uncontestable.",
-    establishes:"Whether the affected person can find out, object, and reach a human",
-    opts:[["yes","Yes, there is a stated appeal path"],["partial","Partially, no formal path"],["no","No, they never find out"]] },
-
-  { n:9,  id:"input_trust", group:"likelihood", q:"Who can put text into this, and does any of them have an incentive to manipulate it?",
-    conditional:"Shown because data leaves the trust boundary",
-    establishes:"Whether any input channel is open to a party with an incentive to manipulate it",
-    opts:[["all_inputs_trusted","All inputs come from trusted parties"],["untrusted_input_constrained","Untrusted input, constrained format"],["untrusted_input_freeform","Untrusted free-form input"]] },
-  { n:10, id:"upstream_data", group:"likelihood", q:"How fresh is the data this system reasons over, and who owns its accuracy?",
-    help:"A model can be perfectly accurate against data that is wrong. Ask how a change in the real world reaches the record the system reads.",
-    establishes:"Freshness, ownership, and accuracy of the data the system reasons over",
-    opts:[["realtime","Real time, owned"],["daily","Daily, owned"],["weekly_or_worse","Weekly or worse"],["no_defined_sla","No defined freshness SLA"]] },
-  { n:11, id:"evaluation_coverage", group:"likelihood", q:"What has it been tested against, and what error rate was observed?",
-    help:"“Unknown” is the honest and common answer before anything is built. Record it rather than skipping it.",
-    establishes:"What it has been tested against, the observed error rate, what has not been tested",
-    opts:[["ongoing_eval","Tested, with ongoing evaluation"],["tested_once","Tested once at build"],["minimal","Minimal or ad hoc testing"],["none","Not tested"]] },
-
-  { n:12, id:"detectability", group:"visibility", q:"If it produced a wrong output right now, how would you find out?",
-    establishes:"Whether you would know it was wrong, and how fast",
-    opts:[["automated_immediate","Automated, immediately"],["automated_delayed","Automated, on a delay"],["human_review_catches","A human reviewer catches it"],["user_complaint_only","Only if a user complains"],["incident_only","Only from an incident"],["no_mechanism","No mechanism at all"]] },
-  { n:13, id:"provenance", group:"visibility", q:"Six months from now, can you reconstruct why it produced a specific output?",
-    establishes:"Whether you can reconstruct why it produced what it did",
-    opts:[["full_reconstruction","Full reconstruction"],["partial","Partial"],["output_only","Output logged only"],["nothing_retained","Nothing retained"]] },
-
-  { n:14, id:"human_in_loop", group:"controls", q:"Does a human review output before it has effect?",
-    help:"A reviewer with no accountability and no time produces rubber-stamping, which scores as review and functions as none.",
-    establishes:"Reviewed always, sampled, or never",
-    opts:[["every_output_accountable","Every output, reviewer is accountable"],["every_output_unaccountable","Every output, but nobody is accountable"],["sampled_review","Sampled review"],["exception_review_only","Exceptions only"],["no_review","No review"]] },
-  { n:15, id:"disclosure", group:"controls", q:"Does the person receiving the output know an AI system produced it?",
-    establishes:"Whether the person knows AI is involved",
-    opts:[["explicit_disclosure","Explicitly disclosed"],["discoverable","Discoverable if they look"],["not_disclosed","Not disclosed"]] },
-  { n:16, id:"vendor_terms", group:"controls", q:"Who processes this data, under what terms?",
-    conditional:"Shown because data leaves the trust boundary",
-    establishes:"Provider, training-on-input, retention, processing region, subprocessors",
-    opts:[["reviewed_no_training","Reviewed contract, no training on inputs"],["reviewed_retention_unclear","Reviewed, but retention is unclear"],["standard_terms_unreviewed","Standard terms, nobody reviewed them"],["unknown","Unknown"]] },
-  { n:17, id:"accountable_owner", group:"controls", q:"After this assessment is filed, who owns the risk?",
-    help:"A named person, not a team. An assessment with no owner is a document, not a control.",
-    establishes:"Who owns the risk, who reviews it, who can override a “do not ship”",
-    opts:[["named_owner_cadence","Named owner with a review cadence"],["named_owner_no_cadence","Named owner, no review cadence"],["team_only","A team, nobody specific"],["nobody","Nobody yet"]] }
-];
-
-const PRESETS = {
-  allergen: { _profile:"restaurant",
-    data_exposure:"yes_content", model_behavior:"open_generation", autonomy:"produces_output",
-    audience:["business_customer","end_consumer"], exposure_volume:"general_availability",
-    failure_mode:"physical_harm", reversibility:"irreversible", contestability:"no",
-    input_trust:"untrusted_input_freeform", upstream_data:"no_defined_sla", evaluation_coverage:"none",
-    detectability:"incident_only", provenance:"output_only",
-    human_in_loop:"no_review", disclosure:"not_disclosed", vendor_terms:"standard_terms_unreviewed",
-    accountable_owner:"nobody" },
-  forecaster: { _profile:"restaurant",
-    data_exposure:"no", model_behavior:"constrained_generation", autonomy:"recommends_action",
-    audience:["internal_staff","business_customer"], exposure_volume:"staged_rollout",
-    failure_mode:"financial_loss", reversibility:"trivially_reversible", contestability:"yes",
-    upstream_data:"daily", evaluation_coverage:"tested_once",
-    detectability:"automated_delayed", provenance:"full_reconstruction",
-    human_in_loop:"every_output_accountable", disclosure:"explicit_disclosure",
-    accountable_owner:"named_owner_cadence" }
-};
+/* The rules live in triage.js, shared with the CLI (bin/triage.mjs), so the
+   page and the command line cannot disagree. This file only renders. */
+const T = window.Triage;
+const { PROFILES, SEVERITY, LIKELIHOOD, DETECT, GROUPS, DIMS, PRESETS } = T;
 
 const DECISIONS = [
   ["Bands, not scores",
@@ -563,18 +491,10 @@ const state = { profile:"restaurant", answers:{} };
 const $ = s => document.querySelector(s);
 const el = (t,c,txt) => { const e=document.createElement(t); if(c) e.className=c; if(txt!=null) e.textContent=txt; return e; };
 
-function conditionalsActive() {
-  return state.answers.data_exposure && state.answers.data_exposure !== "no";
-}
-
-function visibleDims() {
-  return DIMS.filter(d => !d.conditional || conditionalsActive());
-}
-
-function archetypeOpts() {
-  const p = PROFILES[state.profile];
-  return Object.entries(p.archetypes).map(([k,v]) => [k, v.label]);
-}
+const conditionalsActive = () => T.conditionalsActive(state.answers);
+const visibleDims = () => T.visibleDims(state.answers);
+const archetypeOpts = () => T.archetypeOpts(state.profile);
+const score = () => T.score(state.answers, state.profile);
 
 function renderForm() {
   const pane = $("#formPane");
@@ -637,115 +557,6 @@ function renderQ(d) {
   return wrap;
 }
 
-/* ---------------- scoring ---------------- */
-const W = {
-  model_behavior:      { constrained_lookup:0, constrained_generation:1, open_generation:2, agentic_multistep:3 },
-  exposure_volume:     { prototype:0, limited_pilot:1, staged_rollout:2, general_availability:3 },
-  input_trust:         { all_inputs_trusted:0, untrusted_input_constrained:1, untrusted_input_freeform:2 },
-  upstream_data:       { realtime:0, daily:1, weekly_or_worse:2, no_defined_sla:3 },
-  evaluation_coverage: { ongoing_eval:0, tested_once:1, minimal:2, none:3 },
-  detectability:       { automated_immediate:0, automated_delayed:1, human_review_catches:1, user_complaint_only:3, incident_only:4, no_mechanism:4 },
-  provenance:          { full_reconstruction:0, partial:1, output_only:2, nothing_retained:3 },
-  reversibility:       { trivially_reversible:0, reversible_with_effort:1, partially_reversible:2, irreversible:3 }
-};
-const MAXW = { model_behavior:3, exposure_volume:3, input_trust:2, upstream_data:3, evaluation_coverage:3, detectability:4, provenance:3 };
-
-function score() {
-  const a = state.answers, P = PROFILES[state.profile];
-  const unknowns = visibleDims().filter(d => {
-    const v = a[d.id];
-    return d.multi ? !(v && v.length) : !v;
-  });
-
-  // severity from the profile anchor
-  let sev = null;
-  if (a.failure_mode && P.archetypes[a.failure_mode]) sev = P.archetypes[a.failure_mode].severity;
-
-  // likelihood
-  const lkKeys = ["model_behavior","exposure_volume","input_trust","upstream_data","evaluation_coverage"];
-  let lkPts = 0, lkMax = 0;
-  lkKeys.forEach(k => {
-    if (k === "input_trust" && !conditionalsActive()) return;
-    lkMax += MAXW[k];
-    if (a[k] != null && W[k][a[k]] != null) lkPts += W[k][a[k]];
-  });
-  const lkPct = lkMax ? lkPts / lkMax : 0;
-  let lk = lkPct >= 0.60 ? 2 : lkPct >= 0.33 ? 1 : 0;
-
-  // detectability (inverted: higher points = worse = "Low")
-  let dtPts = 0, dtMax = MAXW.detectability + MAXW.provenance;
-  ["detectability","provenance"].forEach(k => { if (a[k] != null && W[k][a[k]] != null) dtPts += W[k][a[k]]; });
-  const dtPct = dtPts / dtMax;
-  let dt = dtPct >= 0.60 ? 2 : dtPct >= 0.30 ? 1 : 0;
-
-  // rule 4: unaccountable review is not a mitigating control
-  const rules = [], conditions = [];
-  if (a.human_in_loop === "every_output_unaccountable") {
-    rules.push(["Unaccountable review","Every output is reviewed but nobody is accountable for what they approve. The review does not count as a mitigating control until that is resolved."]);
-    if (dt < 2) dt = Math.min(2, dt + 1);
-  }
-
-  // rule 3: volume amplification
-  if (sev != null && sev >= 1 && a.exposure_volume === "general_availability" && dt === 2 && lk < 2) {
-    lk = Math.min(2, lk + 1);
-    rules.push(["Volume amplification","Moderate-or-worse severity at general availability with low detectability. Likelihood is treated as one band higher than derived."]);
-  }
-
-  // rule 2: no recourse on an affected third party
-  const aud = a.audience || [];
-  let escalated = false;
-  if ((aud.includes("third_party_no_interaction") || aud.includes("end_consumer")) && (a.contestability === "no" || !a.contestability)) {
-    rules.push(["No recourse on an affected party","The output lands on someone who cannot find out it happened or object to it. Escalated one band, with a blocking open question."]);
-    escalated = true;
-  }
-
-  // rule 1: undetectable severe harm
-  const revBad = a.reversibility === "partially_reversible" || a.reversibility === "irreversible";
-  let verdict, vkey;
-  const rule1 = (sev === 3 && dt === 2 && revBad);
-  if (rule1) rules.unshift(["Undetectable severe harm","Severity is Severe, detectability is Low, and the effect cannot be fully undone. This escalates regardless of how the other fourteen dimensions answer."]);
-
-  if (sev == null) { verdict = "Cannot assess"; vkey = "conditions"; }
-  else if (rule1) { verdict = "Do not ship as designed"; vkey = "no"; }
-  else if (sev >= 2 || escalated || lk === 2 || dt === 2 || a.human_in_loop === "no_review") { verdict = "Ship with conditions"; vkey = "conditions"; }
-  else { verdict = "Ship"; vkey = "ship"; }
-
-  // conditions derived from the weak dimensions
-  if (a.upstream_data === "no_defined_sla" || a.upstream_data === "weekly_or_worse")
-    conditions.push("Define a freshness SLA and a named owner for the upstream data, and document how a real-world change reaches the record the system reads.");
-  if (a.input_trust === "untrusted_input_freeform" && (a.model_behavior === "open_generation" || a.model_behavior === "agentic_multistep"))
-    conditions.push("Bound the answer contract so an untrusted free-form input cannot elicit an unbounded generative response. Constrain what the system is permitted to affirm.");
-  if (dt === 2)
-    conditions.push("Add a detection mechanism before general availability. Right now a wrong output is found by incident or complaint, which is too late to be a control.");
-  if (a.provenance === "nothing_retained" || a.provenance === "output_only")
-    conditions.push("Log inputs, model and prompt version, and outputs with a stated retention period, so a specific output can be reconstructed later.");
-  if (a.contestability === "no" || a.contestability === "partial")
-    conditions.push("Give the affected person a stated route to find out an AI system was involved and reach a human who can change the outcome.");
-  if (a.human_in_loop === "no_review" && sev != null && sev >= 2)
-    conditions.push("Introduce review proportionate to the severity band, with a reviewer who is accountable for what they approve.");
-  if (a.human_in_loop === "every_output_unaccountable")
-    conditions.push("Name who is accountable for approved output, and give the reviewer enough time that review is not rubber-stamping.");
-  if (a.evaluation_coverage === "none" || a.evaluation_coverage === "minimal")
-    conditions.push("Establish an evaluation set and an observed error rate before rollout widens. Untested is not the same as working.");
-  if (a.vendor_terms === "standard_terms_unreviewed" || a.vendor_terms === "unknown")
-    conditions.push("Have someone read the processing terms: training on inputs, retention period, processing region, and subprocessors.");
-  if (a.disclosure === "not_disclosed" && (aud.includes("end_consumer") || aud.includes("third_party_no_interaction")))
-    conditions.push("Disclose that an AI system is involved to the person receiving the output.");
-  if (a.accountable_owner === "nobody" || a.accountable_owner === "team_only")
-    conditions.push("Name a person who owns this risk, a review cadence, and who can override a do-not-ship.");
-
-  // open questions
-  const blocking = [], nonBlocking = [];
-  unknowns.forEach(d => {
-    const decisive = ["failure_mode","reversibility","contestability","upstream_data","detectability"].includes(d.id);
-    const line = "Dimension " + d.n + ": " + d.q;
-    (decisive ? blocking : nonBlocking).push(line);
-  });
-  if (escalated && !blocking.some(b => b.includes("Dimension 8")))
-    blocking.push("Who is accountable for the affected party's recourse, and what is the stated appeal path?");
-
-  return { sev, lk, dt, verdict, vkey, rules, conditions, blocking, nonBlocking, unknowns };
-}
 
 /* ---------------- result rendering ---------------- */
 const BAND_COLOR = {
@@ -798,6 +609,35 @@ function renderResult() {
   bands.append(bandRow("Detectability", r.sev==null?null:r.dt, DETECT,     BAND_COLOR.dt));
   pane.append(bands);
 
+  // path to yes: computed, not prose
+  const path = T.pathToYes(state.answers, state.profile);
+  const map = el("div","riskmap");
+  map.innerHTML = T.riskMapSVG(r, path, { palette: T.CSSVARS });
+  pane.append(map);
+  pane.append(el("div","res-h","Path to yes"));
+  if (r.sev == null) pane.append(el("p","empty","Answer dimension 6 first."));
+  else if (r.vkey === "ship") pane.append(el("p","empty","Already at Ship. No conditions manufactured to look thorough."));
+  else {
+    path.steps.forEach((st, i) => {
+      const box = el("div","yes-step"); box.dataset.v = st.to;
+      const h = el("div","yes-h");
+      h.append(el("span","yes-n", String(i + 1)), document.createTextNode("Reaches " + st.verdict + " with " + st.changes.length + " change" + (st.changes.length > 1 ? "s" : "")));
+      box.append(h);
+      st.changes.forEach(c => {
+        const row = el("div","yes-change");
+        const lab = el("div","yes-dim", String(c.n).padStart(2,"0") + " " + c.dim.replace(/_/g," "));
+        const mv = el("div","yes-move");
+        mv.append(el("s",null,c.fromLabel), document.createTextNode(" → "), el("strong",null,c.toLabel));
+        const apply = el("button","btn yes-apply","Apply");
+        apply.addEventListener("click", () => { state.answers[c.dim] = c.to; renderForm(); update(); });
+        row.append(lab, mv, el("p","yes-hint",c.hint), apply);
+        box.append(row);
+      });
+      pane.append(box);
+    });
+    if (path.ceiling) pane.append(el("p","yes-ceiling",path.ceiling));
+  }
+
   pane.append(el("div","res-h","Escalation rules fired"));
   if (r.rules.length) r.rules.forEach(([t,d]) => {
     const b = el("div","rule-fired");
@@ -830,7 +670,11 @@ function renderResult() {
 
   const dl = el("button","btn btn-primary","Download assessment (.md)");
   dl.addEventListener("click", downloadMd);
-  pane.append(dl);
+  const sp = el("button","btn","Export spec for CI (.yaml)");
+  sp.addEventListener("click", downloadSpec);
+  const actions = el("div","controls");
+  actions.append(dl, sp);
+  pane.append(actions);
 
   const note = el("p","empty");
   note.style.marginTop="12px";
@@ -838,69 +682,35 @@ function renderResult() {
   pane.append(note);
 }
 
-function downloadMd() {
-  const r = score(), a = state.answers, P = PROFILES[state.profile];
-  const L = [];
-  L.push("# Risk triage: (name this feature)");
-  L.push("");
-  L.push("Profile: " + P.label + " | Questionnaire v2.0 | Assessed (date) | Expires (date + 12 months)");
-  L.push("");
-  L.push("## Recommendation");
-  L.push("");
-  L.push("**" + r.verdict + "**");
-  L.push("");
-  L.push("## Risk profile");
-  L.push("");
-  L.push("- Harm archetype: " + (a.failure_mode ? P.archetypes[a.failure_mode].label : "not established"));
-  L.push("- Severity: " + (r.sev==null?"unknown":SEVERITY[r.sev]));
-  L.push("- Likelihood: " + (r.sev==null?"unknown":LIKELIHOOD[r.lk]));
-  L.push("- Detectability: " + (r.sev==null?"unknown":DETECT[r.dt]));
-  L.push("");
-  L.push("Escalation rules fired: " + (r.rules.length ? "" : "none"));
-  r.rules.forEach(([t,d]) => L.push("- **" + t + ".** " + d));
-  L.push("");
-  L.push("## Assessment");
-  L.push("");
-  visibleDims().forEach(d => {
-    const val = a[d.id];
-    let tag, text;
-    if (d.multi) {
-      if (val && val.length) { tag="stated"; text = val.map(v => (d.opts.find(o=>o[0]===v)||[,v])[1]).join(", "); }
-      else { tag="unknown"; text="not answered"; }
-    } else if (val) {
-      tag="stated";
-      const opts = d.archetype ? archetypeOpts() : d.opts;
-      text = (opts.find(o=>o[0]===val)||[,val])[1];
-    } else { tag="unknown"; text="not answered"; }
-    L.push("- **" + String(d.n).padStart(2,"0") + " " + d.establishes + "** [" + tag + "] " + text);
-  });
-  L.push("");
-  L.push("Severity band is [derived] from the profile's anchor for the selected harm archetype. Likelihood and detectability bands are [derived] from the dimensions listed in core/scoring.md.");
-  L.push("");
-  L.push("## Conditions");
-  L.push("");
-  if (r.conditions.length) r.conditions.forEach(c => L.push("- " + c)); else L.push("None.");
-  L.push("");
-  L.push("## Open questions");
-  L.push("");
-  if (r.blocking.length) { L.push("**Blocking** (resolving these either way would change the recommendation):"); L.push(""); r.blocking.forEach(q => L.push("- " + q)); L.push(""); }
-  if (r.nonBlocking.length) { L.push("**Non-blocking:**"); L.push(""); r.nonBlocking.forEach(q => L.push("- " + q)); L.push(""); }
-  if (!r.blocking.length && !r.nonBlocking.length) L.push("None outstanding.");
-  L.push("");
-  L.push("## Reassessment");
-  L.push("");
-  L.push("Expires 12 months from assessment, or on any of: model or model version change, prompt or system instruction change, new or changed upstream data source, change to vendor terms or retention or processing region, expansion of audience or a material increase in volume, or any incident involving this feature.");
-  L.push("");
-  L.push("---");
-  L.push("");
-  L.push("Generated by AI Feature Risk Triage. Not a compliance certification, not a legal review, not a gate.");
-
-  const blob = new Blob([L.join("\n")], {type:"text/markdown"});
-  const url = URL.createObjectURL(blob);
+function save(name, text, type) {
+  const url = URL.createObjectURL(new Blob([text], {type}));
   const a2 = document.createElement("a");
-  a2.href = url; a2.download = "risk-triage-assessment.md";
+  a2.href = url; a2.download = name;
   document.body.append(a2); a2.click(); a2.remove();
   setTimeout(() => URL.revokeObjectURL(url), 1000);
+}
+
+function downloadMd() {
+  const date = new Date().toISOString().slice(0,10);
+  const spec = { name: "(name this feature)", profile: state.profile, answers: state.answers };
+  save("risk-triage-assessment.md",
+    T.toMarkdown(spec, score(), T.pathToYes(state.answers, state.profile), { date, expires: T.addMonths(date, 12) }),
+    "text/markdown");
+}
+
+/* The same answers as a spec the CLI reads, so a web triage can become a
+   lock file in CI: save as ai-features/<name>.yaml, run triage assess. */
+function downloadSpec() {
+  const q = v => /^(yes|no|true|false|null|~)$/.test(v) ? "\"" + v + "\"" : v;
+  const L = ["# Exported from ai-feature-risk-triage.netlify.app", "# Fill in system, then run: npx triage assess <this file>",
+    "name: (name this feature)", "profile: " + state.profile, "assessor: (a named person)",
+    "system:", "  model: (provider/model-version)", "  prompt: (path to the system prompt file)", "  data_sources: [(source)]", "answers:"];
+  DIMS.forEach(d => {
+    const v = state.answers[d.id];
+    if (v == null || (Array.isArray(v) && !v.length)) return;
+    L.push("  " + d.id + ": " + (Array.isArray(v) ? "[" + v.join(", ") + "]" : q(v)));
+  });
+  save("feature.yaml", L.join("\n") + "\n", "text/yaml");
 }
 
 /* ---------------- static sections ---------------- */

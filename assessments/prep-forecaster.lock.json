@@ -1,0 +1,22 @@
+{
+  "spec": "examples/prep-forecaster.yaml",
+  "name": "Kitchen prep-quantity forecaster",
+  "assessed": "2026-11-18",
+  "expires": "2027-11-18",
+  "assessor": "Example Team",
+  "questionnaire": "2.0",
+  "verdict": "Ship",
+  "bands": {
+    "severity": "Moderate",
+    "likelihood": "Occasional",
+    "detectability": "High"
+  },
+  "rules_fired": [],
+  "fingerprints": {
+    "answers": "0508815ba8051f0d",
+    "scoring rules": "398eef2e90a95f5e",
+    "model": "in-house/gbm-forecaster-v3",
+    "data source: pos_sales_history": "0e8208e2dfd2380e",
+    "data source: inventory_counts": "d45d43c6b07cf7d3"
+  }
+}

@@ -1,0 +1,23 @@
+# Takes action without review, saved by reversibility and reconciliation.
+name: Automated supplier invoice coding
+profile: restaurant
+assessor: Example Team
+system:
+  model: in-house/invoice-classifier-v2
+  data_sources: [supplier_invoices, general_ledger]
+answers:
+  data_exposure: "no"
+  model_behavior: constrained_lookup
+  autonomy: takes_action_reversible
+  audience: [internal_staff]
+  exposure_volume: general_availability
+  failure_mode: financial_loss
+  reversibility: reversible_with_effort
+  contestability: "yes"
+  upstream_data: daily
+  evaluation_coverage: tested_once
+  detectability: automated_delayed
+  provenance: full_reconstruction
+  human_in_loop: exception_review_only
+  disclosure: explicit_disclosure
+  accountable_owner: named_owner_no_cadence

@@ -33,7 +33,7 @@ Bands, not scores. Three axes resolved separately and never averaged into one nu
 
 These override the band combination. They exist because averaging hides the interaction.
 
-1. **Undetectable severe harm.** Severity Severe AND Detectability Low AND Reversibility partially_reversible or worse. Recommendation escalates to *do not ship as designed*, regardless of every other answer.
+1. **Undetectable severe harm.** Severity Severe AND Reversibility partially_reversible or worse AND either Detectability Low or dimension 12 is `user_complaint_only`, `incident_only` or `no_mechanism`. Recommendation escalates to *do not ship as designed*, regardless of every other answer. The second detectability test exists because provenance (dimension 13) feeds the detectability band but cannot notice anything in time: full logging lets you reconstruct a failure afterwards, and on its own it must not clear this rule.
 
 2. **No recourse on an affected third party.** Audience includes `third_party_no_interaction` AND contestability `can_discover` is no or unknown. Escalates one band and adds a blocking open question.
 

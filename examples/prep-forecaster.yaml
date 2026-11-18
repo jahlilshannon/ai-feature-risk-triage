@@ -1,0 +1,26 @@
+# The README's discriminating example. Expected: ship. A regression test
+# fails if this ever comes back with a high severity or a do-not-ship.
+name: Kitchen prep-quantity forecaster
+profile: restaurant
+assessor: Example Team
+system:
+  model: in-house/gbm-forecaster-v3
+  data_sources: [pos_sales_history, inventory_counts]
+answers:
+  data_exposure: "no"
+  model_behavior: constrained_generation
+  autonomy: recommends_action
+  audience: [internal_staff, business_customer]
+  exposure_volume: staged_rollout
+  failure_mode: financial_loss
+  reversibility: trivially_reversible
+  contestability: "yes"
+  upstream_data: daily
+  evaluation_coverage: tested_once
+  detectability: automated_delayed
+  provenance: full_reconstruction
+  human_in_loop: every_output_accountable
+  disclosure: explicit_disclosure
+  accountable_owner: named_owner_cadence
+notes:
+  failure_mode: Over- or under-prepping for a day. Shows up in inventory within a day.
