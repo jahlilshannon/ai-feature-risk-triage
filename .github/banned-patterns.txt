@@ -4,3 +4,11 @@
 631 stories
 2,166
 SAFe [56] Agilist
+\$[0-9][0-9,.]*[kmb]? (of|in|on) (ai|llm|model|token|api|tool|copilot|claude|openai)
+(ai|llm|token|api|tool|model|copilot|claude) (usage|spend|spending|cost|costs|budget|bill)[^.]*\$[0-9]
+technical preview
+security (event|exception|breach|incident)
+governance (approval|sign-off|signoff)
+approved by [^.]*governance
+(data|privacy|production|customer) incident
+incident (report|ticket|number|postmortem|post-mortem)
